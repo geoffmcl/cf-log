@@ -201,6 +201,8 @@ static sgdQuat *fromLonLatRad(double lon, double lat)
     return &q;
 }
 
+#if 0 // 000000000000000000000000000000000000000000000000000
+// this FAILS!!! relaced below
 static sgdQuat *mult_quats(sgdQuat *rv1, sgdQuat *rv2)
 {
     static sgdQuat _s_mquat;
@@ -211,6 +213,7 @@ static sgdQuat *mult_quats(sgdQuat *rv1, sgdQuat *rv2)
     *v[QW] = *rv1[QW] * *rv2[QW] - *rv1[QX] * *rv2[QX] - *rv1[QY] * *rv2[QY] - *rv1[QZ] * *rv2[QZ];
     return v;
 }
+#endif // 00000000000000000000000000000000000000000000000000
 
 sgdQuat *m_mult2(const sgdQuat & v1, const sgdQuat & v2) 
 {

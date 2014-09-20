@@ -228,6 +228,15 @@ int open_raw_log_whole()
     int key = 0;
     const char *tf = raw_log;
     time_t diff, curr, last_expire, pilot_ttl, last_json;
+    size_t i, bgn;
+    bgn = 0;
+    Packet_Type pt;
+    double bgn_secs = get_seconds();
+    pilot_ttl = m_PlayerExpires;
+    curr = last_expire = time(0);
+    last_json = 0;
+    size_t rd = 0;
+    
     if (stat(tf,&sbuf)) {
         SPRTF("%s: Failed to stat '%s'!\n", module, tf);
         return 1;
@@ -249,7 +258,7 @@ int open_raw_log_whole()
         key = 1;
         goto exit;
     }
-    size_t rd = fread(cp,1,size,fp);
+    rd = fread(cp,1,size,fp);
     fclose(fp);
     fp = 0;
     if (rd != size) {
@@ -258,13 +267,6 @@ int open_raw_log_whole()
         goto exit;
     }
 
-    size_t i, bgn;
-    bgn = 0;
-    Packet_Type pt;
-    double bgn_secs = get_seconds();
-    pilot_ttl = m_PlayerExpires;
-    curr = last_expire = time(0);
-    last_json = 0;
     for (i = 0; i < size; i++) {
         if ((cp[i+0] == 'S') && (cp[i+1] == 'F') &&
             (cp[i+2] == 'G') && (cp[i+3] == 'F')) {
@@ -323,6 +325,7 @@ int split_raw_log_whole( char *new_log, size_t count, size_t begin )
 {
     int key = 0;
     const char *tf = raw_log;
+    size_t rd = 0;
     FILE *out = fopen( new_log, "wb" );
     if (!out) {
         SPRTF("%s: Failed to create new log file '%s'\n", module, new_log );
@@ -349,7 +352,7 @@ int split_raw_log_whole( char *new_log, size_t count, size_t begin )
         key = 1;
         goto exit;
     }
-    size_t rd = fread(cp,1,size,fp);
+    rd = fread(cp,1,size,fp);
     fclose(fp);
     fp = 0;
     if (rd != size) {

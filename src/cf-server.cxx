@@ -9,6 +9,10 @@
 #include <stdio.h>
 #include <string.h> // for strlen(), strdup(), ...
 #include <time.h>
+#ifndef _MSC_VER
+#include <stdlib.h> // for atoi(), ...
+#include <unistd.h> // usleep(), ...
+#endif
 #include "mongoose.h"
 #include "cf-log.hxx"
 #include "cf_misc.hxx"

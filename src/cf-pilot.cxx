@@ -9,6 +9,10 @@
 #include <stdio.h>
 #include <vector>
 #include <time.h>
+#ifndef _MSC_VER
+#include <string.h> // for strcpy(), ...
+#include <stdlib.h> // for abs(), ...
+#endif // !_MSC_VER
 #ifdef USE_SIMGEAR
 // so use SGMath.hxx
 #include <simgear/compiler.h>

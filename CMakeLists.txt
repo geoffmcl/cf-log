@@ -155,6 +155,11 @@ endif()
 
 ###################################################################################
 # 20140920: Add mongoose to do the http handling
+if (NOT WIN32)
+    #  CMAKE_THREAD_LIBS_INIT     - the thread library
+    find_package(Threads REQUIRED)
+    list( APPEND EXTRA_LIBS ${CMAKE_THREAD_LIBS_INIT} )
+endif ()
 set(name mongoose)
 set(dir src/${name})
 include_directories( ${dir} )
