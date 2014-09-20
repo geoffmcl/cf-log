@@ -1,13 +1,13 @@
 Crossfeed by Raw UDP Log
-------------------------
+========================
 
 cf-log project
-==============
+--------------
 
 This project started because we have (hopefully) temporarily lost our crossfeed host!
 
 What is crossfeed
-=================
+-----------------
 
 <a target="_blank" href="http://flightgear.org">FlightGear</a>, a 'free' flight simulation program has a
 multiplayer network. That is the fgfs app can be started connected to one of the many multiplayer 
@@ -29,7 +29,7 @@ tracker API. Of course it can only 'track' flights on multiplayer servers that a
 tracker.
 
 So What is This?
-================
+----------------
 
 Well for perhaps a day, crossfeed was configured to write the raw udp packets to a log 
 file. A zip of this log can be downloaded from <a href="http://geoffair.org/tmp/cf_raw01.zip">here</a>
