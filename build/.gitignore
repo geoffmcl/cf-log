@@ -1,0 +1,10 @@
+CMakeCache.txt
+CMakeFiles/*
+Makefile
+bldlog-1.txt
+cf-log
+cmake_install.cmake
+libcf_lib.a
+libmongoose.a
+
+
