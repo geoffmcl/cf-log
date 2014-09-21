@@ -1,1 +1,5 @@
 bldlog-1.txt
+cf-log
+libcf_lib.a
+libmongoose.a
+
