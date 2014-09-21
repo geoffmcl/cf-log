@@ -46,8 +46,8 @@
 
 #define fgs_rad2deg(a) (a * SG_RADIANS_TO_DEGREES)
 
-#define ESPRTF SPRTF
-// #define ESPRTF
+//#define ESPRTF SPRTF
+#define ESPRTF(a,...) /* nothing */
 
 //    dot(const SGVec3<T>& v1, const SGVec3<T>& v2)
 // { return v1(0)*v2(0) + v1(1)*v2(1) + v1(2)*v2(2); }
