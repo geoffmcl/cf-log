@@ -364,6 +364,8 @@ sgdQuat *quat_conj(sgdQuat & rq)
 //#      zRad = psi;
 //#    }
 //#  }
+#define FABS    fabs
+#define MY_MIN_VAL 0.00000001
 
 //                              *heading       *pitch        *roll
 void getEulerRad(sgdQuat *q, double *rzRad, double *ryRad, double *rxRad)
@@ -379,13 +381,13 @@ void getEulerRad(sgdQuat *q, double *rzRad, double *ryRad, double *rxRad)
     //# y * z + w * x
     double num = 2 * ( rq[QY] * rq[QZ] + rq[QW] * rq[QX] );
     double den = sqrQW - sqrQX - sqrQY + sqrQZ;
-    if ((abs(den) <= 0.0000001) &&
-        (abs(num) <= 0.0000001) ) {
+    if ((FABS(den) <= MY_MIN_VAL) &&
+        (FABS(num) <= MY_MIN_VAL) ) {
         xRad = 0;
     } else {
         xRad = atan2(num, den);
     }
-    ESPRTF("gur: roll %g from atan2(%lf,%lf)\n", fgs_rad2deg(xRad), num, den );
+    ESPRTF("gur: roll %g from atan2(%lf,%lf) degs %g\n", xRad, num, den, (xRad * RAD2DEG) );
  
     //# x * z - w * y
     double tmp = 2 * ( rq[QX] * rq[QZ] - rq[QW] * rq[QY] );
@@ -396,13 +398,13 @@ void getEulerRad(sgdQuat *q, double *rzRad, double *ryRad, double *rxRad)
     } else {
         yRad = -asin(tmp); // # needs Math::Trig
     }
-    ESPRTF("gur: pitch %g from -asin(%lf)\n", fgs_rad2deg(yRad), tmp );
+    ESPRTF("gur: pitch %g from -asin(%lf) degs %g\n", yRad, tmp, (yRad * RAD2DEG) );
 
     //# x * y + w * z
     num = 2 * ( rq[QX] * rq[QY] + rq[QW] * rq[QZ] ); 
     den = sqrQW + sqrQX - sqrQY - sqrQZ;
-    if ((abs(den) <= 0.0000001) &&
-        (abs(num) <= 0.0000001) ) {
+    if ((FABS(den) <= MY_MIN_VAL) &&
+        (FABS(num) <= MY_MIN_VAL) ) {
         zRad = 0;
     } else {
         double psi = atan2(num, den);
@@ -411,7 +413,7 @@ void getEulerRad(sgdQuat *q, double *rzRad, double *ryRad, double *rxRad)
         }
         zRad = psi;
     }
-    ESPRTF("gur: heading %d from atan2(%lf,%lf)\n", (int)(fgs_rad2deg(zRad) + 0.5), num, den );
+    ESPRTF("gur: heading %g from atan2(%lf,%lf) degs %d\n", zRad, num, den, (int)((zRad * RAD2DEG) + 0.5) );
 
     //# pass value back
     *rxRad = xRad;  // roll

@@ -28,6 +28,18 @@
 #ifndef _CF_EULER_HXX_
 #define _CF_EULER_HXX_
 
+#ifndef M_PI
+#define M_PI       3.14159265358979323846
+#endif
+
+#ifndef RAD2DEG
+#define RAD2DEG ( 180.0 / M_PI )
+#endif
+#ifndef DEG2RAD
+#define DEG2RAD ( M_PI / 180.0 )
+#endif
+
+
 #ifndef USE_SIMGEAR
 extern double cf_norm( Point3D &p3d ); // { return sqrt(cf_dot_prod(p3d, p3d)); }
 extern void euler_get( double lat, double lon, double ox, double oy, double oz,
