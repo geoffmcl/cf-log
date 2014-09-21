@@ -44,6 +44,8 @@
 
 #ifndef USE_SIMGEAR
 
+#define fgs_rad2deg(a) (a * SG_RADIANS_TO_DEGREES)
+
 #define ESPRTF SPRTF
 // #define ESPRTF
 
@@ -363,6 +365,7 @@ sgdQuat *quat_conj(sgdQuat & rq)
 //#    }
 //#  }
 
+//                              *heading       *pitch        *roll
 void getEulerRad(sgdQuat *q, double *rzRad, double *ryRad, double *rxRad)
 {
     double xRad,yRad,zRad;
@@ -372,7 +375,7 @@ void getEulerRad(sgdQuat *q, double *rzRad, double *ryRad, double *rxRad)
     double sqrQX = rq[QX] * rq[QX];
     double sqrQY = rq[QY] * rq[QY];
     double sqrQZ = rq[QZ] * rq[QZ];
-
+    ESPRTF("gur: sgdQuat(%s) Squares XYZW %lf,%lf,%lf,%lf\n", get_quat_stg2(q), sqrQX, sqrQY, sqrQZ, sqrQW );
     //# y * z + w * x
     double num = 2 * ( rq[QY] * rq[QZ] + rq[QW] * rq[QX] );
     double den = sqrQW - sqrQX - sqrQY + sqrQZ;
@@ -382,7 +385,8 @@ void getEulerRad(sgdQuat *q, double *rzRad, double *ryRad, double *rxRad)
     } else {
         xRad = atan2(num, den);
     }
-
+    ESPRTF("gur: roll %g from atan2(%lf,%lf)\n", fgs_rad2deg(xRad), num, den );
+ 
     //# x * z - w * y
     double tmp = 2 * ( rq[QX] * rq[QZ] - rq[QW] * rq[QY] );
     if (tmp <= -1) {
@@ -392,6 +396,7 @@ void getEulerRad(sgdQuat *q, double *rzRad, double *ryRad, double *rxRad)
     } else {
         yRad = -asin(tmp); // # needs Math::Trig
     }
+    ESPRTF("gur: pitch %g from -asin(%lf)\n", fgs_rad2deg(yRad), tmp );
 
     //# x * y + w * z
     num = 2 * ( rq[QX] * rq[QY] + rq[QW] * rq[QZ] ); 
@@ -406,17 +411,17 @@ void getEulerRad(sgdQuat *q, double *rzRad, double *ryRad, double *rxRad)
         }
         zRad = psi;
     }
+    ESPRTF("gur: heading %d from atan2(%lf,%lf)\n", (int)(fgs_rad2deg(zRad) + 0.5), num, den );
+
     //# pass value back
-    *rxRad = xRad;
-    *ryRad = yRad;
-    *rzRad = zRad;
+    *rxRad = xRad;  // roll
+    *ryRad = yRad;  // pitch
+    *rzRad = zRad;  // heading
 
 }
 
-
-#define fgs_rad2deg(a) (a * SG_RADIANS_TO_DEGREES)
-
 //# uses getEulerRad, and converts to degrees
+//                              *heading       *pitch        *roll
 void getEulerDeg(sgdQuat *rq, double *rzDeg, double *ryDeg, double *rxDeg)
 {
     //my ($rq,$rzDeg,$ryDeg,$rxDeg) = @_;
