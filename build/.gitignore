@@ -6,5 +6,16 @@ cf-log
 cmake_install.cmake
 libcf_lib.a
 libmongoose.a
-
+*.vcxproj
+*.filters
+*.user
+Debug/*
+Release/*
+Win32/*
+*.dir/*
+*.opensdf
+*.sdf
+*.sln
+*.suo
+ipch/*
 
