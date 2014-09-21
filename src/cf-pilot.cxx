@@ -517,7 +517,7 @@ Packet_Type Deal_With_Packet( char *packet, int len )
         pp->dist_m = 0.0;
         pp->total_nm = 0.0;
         vPilots.push_back(*pp);
-        print_pilot(pp,"FRST",pt_Pos);
+        print_pilot(pp,(char *)"NEW ",pt_Pos);
         return pkt_First;
 
     } else if (MsgId == CHAT_MSG_ID) {
@@ -567,7 +567,7 @@ void packet_stats()
             SPRTF("%s %d ", pps[i].desc, cnt );
         }
     }
-    SPRTF("Total %d, Bad %d\n", PacketCount, Bad_Packets );
+    SPRTF("Total %d, Discarded %d, Bad %d\n", PacketCount, DiscardCount, Bad_Packets );
 
 }
 

@@ -91,6 +91,34 @@ void clean_up_log()
     raw_log_buffer = 0;
 }
 
+/////////////////////////////////////////////////////////////////
+// int get_next_block()
+//
+// Will process the current udp block - that is pass it to 
+// Deal_With_Packet( buf, len )
+// whihc 'decodes' the udp packet, and stores the 'live'
+// pilots into the vector vPilots.
+//
+// Then will read any remaining data from the file to re-fill
+// the buffer, and search for the 'next' udp packet.
+//
+// If fails to find 'next' udp packet will return 0 - sort of
+// like end of file.
+//
+// Will return 1 if a next packet is found, thus is intended
+// to be used like -
+// while (get_next_block()) {
+//      process flight data
+// } else
+// time to reset the file back to the beginning.
+//
+// The caller should take care of the timing of these get_next_Block()
+// calls. During the processing of the udp packet, the double
+// elapsed_sim_time variable will be advanced as sim time advances,
+// and can be used to 'regulate' calls to get_next_block()
+//
+/////////////////////////////////////////////////////////////////
+
 int get_next_block()
 {
     int key = 0;
@@ -144,9 +172,21 @@ Bad_Read:
     return key;
 }
 
+/////////////////////////////////////////////////////////////////
+// int open_raw_log()
+// 
+// Open the raw log 'rb', allocate a read buffer, and
+// search for the first udp block.
+//
+// If successful return 0, else 1 is an error
+//
+// If successful, next call should be to get_next_block()
+// to process the current block, load data and find next.
+//
+////////////////////////////////////////////////////////////////
+
 int open_raw_log()
 {
-    int key = 0;
     const char *tf = raw_log;
     if (stat(tf,&sbuf)) {
         SPRTF("%s: Failed to stat '%s'!\n", module, tf);
@@ -469,7 +509,7 @@ int main( int argc, char **argv )
 int main_test( int argc, char **argv )
 {
     int iret = 0;
-    set_log_file("tempcflog.txt",false);
+    set_log_file((char *)"tempcflog.txt",false);
     //test_sleeps();
     verbosity = 2;
 #ifdef USE_WHOLE_READ

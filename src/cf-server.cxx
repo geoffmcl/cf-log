@@ -359,7 +359,7 @@ static int event_handler(struct mg_connection *conn, enum mg_event ev)
 {
     int iret = MG_FALSE;
     int i;
-    bool verb = (VERB1) ? true : false;
+    // bool verb = (VERB1) ? true : false;
     const char *q = (conn->query_string && *conn->query_string) ? "?" : "";
     cb_cnt++;
     if (ev == MG_AUTH) {
