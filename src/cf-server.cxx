@@ -366,17 +366,19 @@ static int event_handler(struct mg_connection *conn, enum mg_event ev)
         return MG_TRUE;   // Authorize all requests
     } else if (ev == MG_REQUEST) {
         http_cnt++;
-        SPRTF("%s: got URI %s%s%s\n", module,
-            conn->uri,q,
-            ((q && *q) ? conn->query_string : "") );
-        if (VERB9) {
-            if (conn->num_headers) {
-                SPRTF("%s: Show of %d headers...\n", module, conn->num_headers);
-                for (i = 0; i < conn->num_headers; i++) {
-                    //struct mg_header *p = &conn->http_headers[i];
-                    const char *n = conn->http_headers[i].name;
-                    const char *v = conn->http_headers[i].value;
-                    SPRTF(" %s: %s\n", n, v );
+        if (VERB5) {
+            SPRTF("%s: got URI %s%s%s\n", module,
+                conn->uri,q,
+                ((q && *q) ? conn->query_string : "") );
+            if (VERB9) {
+                if (conn->num_headers) {
+                    SPRTF("%s: Show of %d headers...\n", module, conn->num_headers);
+                    for (i = 0; i < conn->num_headers; i++) {
+                        //struct mg_header *p = &conn->http_headers[i];
+                        const char *n = conn->http_headers[i].name;
+                        const char *v = conn->http_headers[i].value;
+                        SPRTF(" %s: %s\n", n, v );
+                    }
                 }
             }
         }
@@ -394,7 +396,7 @@ static int event_handler(struct mg_connection *conn, enum mg_event ev)
         }
     }
     if ( (ev == MG_REQUEST) && (iret == MG_FALSE) ) {
-        if (VERB1) {
+        if (VERB2) {
             SPRTF("%s: No repsonse sent! Returning MG_FALSE to mongoose.\n", module );
         }
     }
