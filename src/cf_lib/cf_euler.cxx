@@ -44,7 +44,7 @@
 
 #ifndef USE_SIMGEAR
 
-// #define // ESPRTF SPRTF
+#define ESPRTF SPRTF
 // #define ESPRTF
 
 //    dot(const SGVec3<T>& v1, const SGVec3<T>& v2)
@@ -113,14 +113,15 @@ char *get_quat_stg(sgdQuat *rv4)
 char *get_quat_stg2(sgdQuat *rv4)
 {
     char *tb = GetNxtBuf();
-    double x = *rv4[QX];
-    double y = *rv4[QY];
-    double z = *rv4[QZ];
-    double w = *rv4[QW];
-    sprintf(tb,"%f %f %f %f", x, y, z, w );
+    sgdQuat v;
+    memcpy(&v,rv4,sizeof(sgdQuat));
+    double x = v[QX];
+    double y = v[QY];
+    double z = v[QZ];
+    double w = v[QW];
+    sprintf(tb,"%lf,%lf,%lf,%lf", x, y, z, w );
     return tb;
 }
-
 
 char *get_point3d_stg(Point3D &p)
 {
@@ -128,7 +129,7 @@ char *get_point3d_stg(Point3D &p)
     double x = p.GetX();
     double y = p.GetY();
     double z = p.GetZ();
-    sprintf(tb,"x=%f, y=%f, z=%f", x, y, z );
+    sprintf(tb,"x=%lf, y=%lf, z=%lf", x, y, z );
     return tb;
 }
 
@@ -138,7 +139,7 @@ char *get_point3d_stg2(Point3D *p)
     double x = p->GetX();
     double y = p->GetY();
     double z = p->GetZ();
-    sprintf(tb,"%f %f %f", x, y, z );
+    sprintf(tb,"%lf %lf %lf", x, y, z );
     return tb;
 }
 
@@ -447,18 +448,19 @@ void euler_get( double lat, double lon, double ox, double oy, double oz, double 
     Point3D v;
     v.Set( ox, oy, oz );
     sgdQuat *recOrient = fromAngleAxis(&v);
-    // ESPRTF("From Point3D %s, got sgdQuat %s\n", get_point3d_stg2(&v), get_quat_stg2(recOrient));
+    ESPRTF("eg: From fromAngleAxis(%s), got recOrient %s\n", get_point3d_stg2(&v), get_quat_stg2(recOrient));
     double lat_rad, lon_rad;
     lat_rad = lat * SG_DEGREES_TO_RADIANS;
     lon_rad = lon * SG_DEGREES_TO_RADIANS;
     sgdQuat *qEc2Hl = fromLonLatRad(lon_rad, lat_rad);
-    // ESPRTF("From lat/lon %f,%f, rad %f,%f, fromLonLatRad %s\n", lat, lon, lat_rad, lon_rad, get_quat_stg(qEc2Hl));
+    ESPRTF("eg: From lat/lon %lf,%lf, fromLonLatRad(%lf,%lf) got qEc2Hl %s\n",
+        lat, lon, lat_rad, lon_rad, get_quat_stg2(qEc2Hl));
     sgdQuat *con = quat_conj(*qEc2Hl);
     //sgdQuat *rhlOr = mult_quats(con, recOrient);
     sgdQuat *rhlOr =m_mult2(*con, *recOrient);
-    // ESPRTF("From quat_conj %s, from mult_quats %s\n", get_quat_stg(con), get_quat_stg(rhlOr));
+    ESPRTF("eg: From quat_conj %s, from m_mult2 %s\n", get_quat_stg2(con), get_quat_stg2(rhlOr));
     getEulerDeg(rhlOr, phead, ppitch, proll );
-    // ESPRTF("getEulerDeg returned h=%f, p=%f, r=%f\n", *phead, *ppitch, *proll);
+    ESPRTF("eg: getEulerDeg returned h=%d, p=%g, r=%g\n", (int)(*phead + 0.5), *ppitch, *proll);
 }
 
 #endif // #ifndef USE_SIMGEAR
