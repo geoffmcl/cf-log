@@ -1,7 +1,7 @@
 #!/bin/sh
 #< build-me.sh - cf-log - 20140504
 BN=`basename $0`
-TMPPRJ="cf=log"
+TMPPRJ="cf-log"
 TMPLOG="bldlog-1.txt"
 TMPOPTS=""
 # Possible options to help with problems
