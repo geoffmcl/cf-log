@@ -1,4 +1,5 @@
 # 20140916 - cf-log project
+# 20170310 - Convert UTF-16 win_strptime.cxx to UTF-8 strptime_win.cxx - (recode utf16..utf8 strptime_win.cxx)
 cmake_minimum_required (VERSION 2.8)
 
 project (cf-log)
@@ -127,7 +128,8 @@ list(APPEND lib_HDRS
     list (APPEND lib_HDRS ${dir}/daemon.hxx)
 # endif (UNIX)
 if (WIN32)
-    list(APPEND lib_SRCS ${dir}/win_strptime.cxx)
+    # list(APPEND lib_SRCS ${dir}/win_strptime.cxx)
+    list(APPEND lib_SRCS ${dir}/strptime_win.cxx)
 endif ()
 
 if (USE_GEOGRAPHIC_LIB)
