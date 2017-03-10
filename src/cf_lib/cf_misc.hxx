@@ -74,6 +74,7 @@ enum DiskType {
 extern DiskType is_file_or_directory ( char * path );
 
 #ifdef _MSC_VER
+#if _MSC_VER < 1900
 #if !defined(HAVE_STRUCT_TIMESPEC)
 #define HAVE_STRUCT_TIMESPEC
 #if !defined(_TIMESPEC_DEFINED)
@@ -84,6 +85,7 @@ struct timespec {
 };
 #endif /* _TIMESPEC_DEFINED */
 #endif /* HAVE_STRUCT_TIMESPEC */
+#endif // for OLDER MSVC
 extern int nanosleep( struct timespec *req, struct timespec *rem );
 #endif // _MSC_VER
 
