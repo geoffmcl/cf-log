@@ -41,8 +41,11 @@ if(WIN32 AND MSVC)
     # turn off various warnings
     set(WARNING_FLAGS "${WARNING_FLAGS} /wd4996")
     # foreach(warning 4244 4251 4267 4275 4290 4786 4305)
-    #     set(WARNING_FLAGS "${WARNING_FLAGS} /wd${warning}")
-    # endforeach(warning)
+    # C4267: 'function': conversion from 'size_t' to 'int', possible loss of data
+    # C4244: '=': conversion from '__int64' to 'int', possible loss of data
+    foreach(warning 4244 4267)
+         set(WARNING_FLAGS "${WARNING_FLAGS} /wd${warning}")
+    endforeach()
     set( MSVC_FLAGS "-DNOMINMAX -D_USE_MATH_DEFINES -D_CRT_SECURE_NO_WARNINGS -D_SCL_SECURE_NO_WARNINGS -D__CRT_NONSTDC_NO_WARNINGS" )
     # if (${MSVC_VERSION} EQUAL 1600)
     #    set( MSVC_LD_FLAGS "/FORCE:MULTIPLE" )
@@ -93,6 +96,23 @@ else ()
     else ()
         message(STATUS "*** NOT using Simgear library")
     endif ()
+endif ()
+
+#  GeographicLib_FOUND = GEOGRAPHICLIB_FOUND = TRUE
+#  GeographicLib_INCLUDE_DIRS = /usr/local/include
+#  GeographicLib_LIBRARIES = /usr/local/lib/libGeographic.so
+if( USE_GEOGRAPHIC_LIB )
+    find_package(GeographicLib)
+    if (GeographicLib_FOUND)
+        message( STATUS "*** Found GeographicLib inc ${GeographicLib_INCLUDE_DIRS}, lib ${GeographicLib_LIBRARIES}")
+        include_directories( ${GeographicLib_INCLUDE_DIRS} )
+        list(APPEND add_LIBS ${GeographicLib_LIBRARIES})
+        add_definitions( -DUSE_GeographicLib )
+    else ()
+        message(FATAL_ERROR "*** NOT found GeographicLib library")
+    endif ()
+else ()
+    message(STATUS "*** NOT using GeographicLib library")
 endif ()
 
 # configure_file( ${CMAKE_BINARY_DIR}/config-msvc.h ${CMAKE_BINARY_DIR}/config.h )
