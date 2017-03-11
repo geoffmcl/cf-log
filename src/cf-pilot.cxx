@@ -19,6 +19,9 @@
 #include <simgear/constants.h>
 #include <simgear/math/SGMath.hxx>
 #else
+#ifdef USE_GeographicLib
+#include <geod.hxx>
+#endif
 // use substitute maths
 #include "fg_geometry.hxx"
 #include "cf_euler.hxx"
@@ -32,6 +35,7 @@
 
 static const char *module = "cf-pilot";
 #define mod_name module
+#define M2F 3.28084
 
 static size_t pos_cnt = 0;
 static size_t chat_cnt = 0;
@@ -338,6 +342,13 @@ Packet_Type Deal_With_Packet( char *packet, int len )
             failed_cnt++;
             return pkt_InvPos;
         }
+        // speed in this read raw log app is *not* of the essence
+        // so ALWAYS do the 'alternate' matchs FIRST
+        pp->SenderPosition.Set(px, py, pz);
+        sgCartToGeod(pp->SenderPosition, pp->GeodPoint);
+        lat = pp->GeodPoint.GetX();
+        lon = pp->GeodPoint.GetY();
+        alt = pp->GeodPoint.GetZ(); // this is FEET
 #ifdef USE_SIMGEAR // TOCHECK - Use SG functions
 
         SGVec3d position(px,py,pz);
@@ -361,15 +372,31 @@ Packet_Type Deal_With_Packet( char *packet, int len )
         pp->pitch   = pDeg;
         pp->roll    = rDeg;
 #else // #ifdef USE_SIMGEAR
-        pp->SenderPosition.Set (px, py, pz);
-        sgCartToGeod ( pp->SenderPosition, pp->GeodPoint );
-        lat = pp->GeodPoint.GetX();
-        lon = pp->GeodPoint.GetY();
-        alt = pp->GeodPoint.GetZ();
+#ifdef USE_GeographicLib
+        // This is a test of using GeoGraphicLib version other calcs
+        double dlat, dlon, dalt;
+        if (!geoc_to_geod(&dlat, &dlon, &dalt, px, py, pz)) {
+            double dist;
+            if (!geod_distance(&dist, lat, lon, dlat, dlon)) {
+                if (dist < 10.0) {
+                    lat = dlat;
+                    lon = dlon;
+                    alt = (dalt * M2F); // METERS_TO_FEET;
+                }
+                else {
+#ifndef NDEBUG
+                    SPRTF("%s: Calc differ by %d m, %lf,%lf,%lf vs %lf,%lf,%lf! CHECK ME!\n", module,
+                        (int)dist, lat, lon, alt, dlat, dlon, (dalt * M2F));
+#endif
+                }
+            }
+        }
+#endif // USE_GeographicLib y/n
 #endif // #ifdef USE_SIMGEAR y/n
+        // what ever math used, set pilots position
         pp->lat = lat;;
         pp->lon = lon;
-        pp->alt = alt;
+        pp->alt = alt;  // this is FEET
         if (alt <= -9990.0) {
             failed_cnt++;
             return pkt_InvHgt;
