@@ -1,6 +1,7 @@
-// shp_geod.cxx
+// geod.cxx
 
 // Example of using the GeographicLib::Geocentric class
+// 20170311 - Some example have been removed under COMPILE_EXAMPLE_CODE macro
 
 #include <iostream>
 #include <iomanip>
@@ -25,7 +26,7 @@
 #include "geod.hxx"
 #include "sprtf.hxx"
 
-static const char *mod_name = "shp_geod.cxx";
+static const char *mod_name = "geod.cxx";
 
 using namespace std;
 using namespace GeographicLib;
@@ -198,6 +199,8 @@ int geod_distance( double *pdist,
     }
     return 0;
 }
+
+#ifdef COMPILE_EXAMPLE_CODE
 
 int example_CassiniSoldner()
 {
@@ -472,4 +475,6 @@ int example_MagneticModel()
   return 0;
 }
 
-// eof - shp_geod.cxx
+#endif // #ifdef COMPILE_EXAMPLE_CODE
+
+// eof - geod.cxx
