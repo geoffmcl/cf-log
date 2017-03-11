@@ -9,3 +9,5 @@ bldlog-1.txt
 *.sln
 cmake_install.cmake
 x64/*
+.vs/*
+*.VC.db
