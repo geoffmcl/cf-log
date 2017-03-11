@@ -13,7 +13,7 @@
 @set TMPCM=%TMPSRC%\CMakeLists.txt
 @REM set DOPAUSE=pause
 @set DOPAUSE=ask
-@set TMPSG=X:\install\msvc%VCVERS%0\simgear
+@set TMPSG=X:\install\msvc%VCVERS%0-64\simgear
 @if NOT EXIST %TMPSG%\nul goto NOSGD
 @set TMP3RD=X:\3rdParty.x64
 @if NOT EXIST %TMP3RD%\nul goto NO3RD
@@ -32,6 +32,8 @@
 @set TMPOPTS=-G "Visual Studio %VCVERS% Win64" -DCMAKE_INSTALL_PREFIX=%TMPINS%
 @REM TODO: tape support - set TMPOPTS=%TMPOPTS% -DADD_RMT_LIB:BOOL=YES
 @set TMPOPTS=%TMPOPTS% -DCMAKE_PREFIX_PATH=%TMPSG%;%TMP3RD%
+@REM set TMPOPTS=%TMPOPTS% -DUSE_SIMGEAR_LIB:BOOL=TRUE
+@set TMPOPTS=%TMPOPTS% -DUSE_GEOGRAPHIC_LIB:BOOL=TRUE
 
 :RPT
 @if "%~1x" == "x" goto GOTCMD
