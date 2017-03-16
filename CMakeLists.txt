@@ -208,6 +208,17 @@ if (MSVC)
 endif ()
 target_link_libraries ( ${name} ${add_LIBS} ${EXTRA_LIBS} )
 
+#####################################################################################
+# second EXE
+set(dir src)
+set(name raw-log)
+set( ${name}_SRCS ${dir}/${name}.cxx )
+add_executable( ${name} ${${name}_SRCS} )
+if (MSVC)
+    set_target_properties( ${name} PROPERTIES DEBUG_POSTFIX d )
+endif ()
+target_link_libraries ( ${name} ${add_LIBS} ${EXTRA_LIBS} )
+
 ##########################################################
 # NOTE: NO INSTALL PROVIDED FOR APP NOR LIBRARIES
 ##########################################################
