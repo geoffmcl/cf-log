@@ -182,6 +182,8 @@ else()
     message(STATUS "*** Found SimGear libraries")
 endif()
 
+if (ADD_SIMGEAR_COMPILE_TEST)
+################################################################
 # now we've found SimGear, try test-compiling using its includes
 include(CheckCXXSourceRuns)
 
@@ -230,6 +232,9 @@ if(NOT SIMGEAR_COMPILE_TEST)
             "Try removing 'CMakeCache.txt' and reconfigure with 'cmake'.")
 endif()
 unset(CMAKE_REQUIRED_DEFINITIONS)
+else ()
+    set(SIMGEAR_COMPILE_TEST 1)
+endif ()
 
 include(FindPackageHandleStandardArgs)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(SimGear DEFAULT_MSG
@@ -238,3 +243,4 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS(SimGear DEFAULT_MSG
 endif()
 
 # eof
+

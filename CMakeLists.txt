@@ -52,6 +52,8 @@ if(WIN32 AND MSVC)
     # endif (${MSVC_VERSION} EQUAL 1600)
     # set( NOMINMAX 1 )
     list(APPEND add_LIBS ws2_32.lib)
+else ()
+    set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11" )
 endif()
 
 set( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${WARNING_FLAGS} ${MSVC_FLAGS} -D_REENTRANT" )

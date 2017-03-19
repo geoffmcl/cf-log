@@ -3,6 +3,8 @@
 BN=`basename $0`
 TMPPRJ="cf-log"
 TMPLOG="bldlog-1.txt"
+TMPSG="/home/geoff/fg/next/install/simgear"
+
 TMPOPTS=""
 # Possible options to help with problems
 # TMPOPTS="$TMPOPTS -DCMAKE_VERBOSE_MAKEFILE=ON"
@@ -13,6 +15,10 @@ done
 
 if [ -z "$TMPOPTS" ]; then
 	TMPOPTS="-DCMAKE_INSTALL_PREFIX=$HOME/projects/install/$TMPPRJ"
+fi
+if [ -d "$TMPSG" ]; then
+    TMPOPTS="$TMPOPTS -DUSE_SIMGEAR_LIB:BOOL=TRUE"
+    TMPOPTS="$TMPOPTS -DCMAKE_PREFIX_PATH=$TMPSG"
 fi
 if [ -f "$TMPLOG" ]; then
     rm -f $TMPLOG

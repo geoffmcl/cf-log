@@ -186,7 +186,7 @@ int set_epoch_id_stg( char *cp, uint64_t id )
 #ifdef _MSC_VER
     return sprintf(cp, "%I64u", id);
 #else
-    return sprintf(cp, "%"PRIu64, id);
+    return sprintf(cp, "%" PRIu64, id);
 #endif
 }
 
