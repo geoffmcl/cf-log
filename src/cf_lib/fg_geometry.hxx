@@ -29,7 +29,7 @@
 enum { X, Y, Z };
 enum { Lat, Lon, Alt };
 
-#ifndef USE_SIMGEAR
+// #ifndef USE_SIMGEAR
 
 #define SG_180 180.0
 #define SG_PI 3.1415926535
@@ -102,23 +102,21 @@ class Point3D
 	t_Point3D m_Z;
 }; // class Point3D
 
+#if 0 // 000000000000000000000000000000000000000000000
 void CopyPos (  const Point3D& src, Point3D &dst );
 void Mat4ToCoord ( const sgMat4& src,  Point3D & dst );
-float Distance ( const Point3D & P1, const Point3D & P2 );
 void sgCartToPolar3d(const Point3D& cp, Point3D& Polar );
 void CartToLatLon ( const Point3D& CartPoint , Point3D& LatLonAlt );
-double
-calc_gc_dist ( const Point3D& start, const Point3D& dest );
+double calc_gc_dist ( const Point3D& start, const Point3D& dest );
+bool IsWithinRMiles ( double lat1, double lon1, double lat2, double lon2, double R );
+#endif // 00000000000000000000000000000000000000000000000
 
-bool IsWithinRMiles ( double lat1, double lon1, double lat2, double lon2, 
-    double R );
-
+float Distance(const Point3D & P1, const Point3D & P2);
 void sgCartToGeod ( const Point3D& CartPoint , Point3D& GeodPoint );
 void sgGeodToCart(double lat, double lon, double alt, double* xyz);
 
-#endif // #ifndef USE_SIMGEAR
+// #endif // #ifndef USE_SIMGEAR
 
 #endif // _FG_GEOMETRY2_H_
-
-// vim: ts=2:sw=2:sts=0
+// eof
 

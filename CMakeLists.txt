@@ -156,18 +156,16 @@ if (USE_GEOGRAPHIC_LIB)
     list(APPEND lib_SRCS ${dir}/geod.cxx)
     list(APPEND lib_HDRS ${dir}/geod.hxx)
 endif ()
-if (NOT USE_SIMGEAR_LIB)
-    list(APPEND lib_SRCS
-        ${dir}/fg_geometry.cxx 
-        ${dir}/cf_euler.cxx
-        )
-    list(APPEND lib_HDRS
-        ${dir}/fg_geometry.hxx
-        ${dir}/cf_euler.hxx
-        ${dir}/SGMath2.hxx
-        ) 
-endif ()
-
+### Always add 'alternative` math, even with USE_SIMGEAR_LIB
+list(APPEND lib_SRCS
+    ${dir}/fg_geometry.cxx 
+    ${dir}/cf_euler.cxx
+    )
+list(APPEND lib_HDRS
+    ${dir}/fg_geometry.hxx
+    ${dir}/cf_euler.hxx
+    ${dir}/SGMath2.hxx
+    ) 
 add_library(cf_lib ${LIB_TYPE} ${lib_SRCS} ${lib_HDRS})
 list(APPEND EXTRA_LIBS cf_lib)
 

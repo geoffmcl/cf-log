@@ -28,7 +28,7 @@
 #include <assert.h>
 #include "fg_geometry.hxx"
 
-#ifndef USE_SIMGEAR
+// #ifndef USE_SIMGEAR
 // High-precision versions of the above produced with an arbitrary
 // precision calculator (the compiler might lose a few bits in the FPU
 // operations).  These are specified to 81 bits of mantissa, which is
@@ -460,7 +460,7 @@ void sgGeodToCart ( double lat, double lon, double alt, double* xyz )
 	xyz[2] = z;
 } // sgGeodToCart()
 //////////////////////////////////////////////////////////////////////
-#endif // #ifndef USE_SIMGEAR
+// #endif // #ifndef USE_SIMGEAR
 
 // vim: ts=2:sw=2:sts=0
 

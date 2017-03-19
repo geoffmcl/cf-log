@@ -22,10 +22,10 @@
 #ifdef USE_GeographicLib
 #include <geod.hxx>
 #endif
+#endif
 // use substitute maths
 #include "fg_geometry.hxx"
 #include "cf_euler.hxx"
-#endif
 #include "sprtf.hxx"
 #include "cf_misc.hxx"
 #include "mpMsgs.hxx"
@@ -79,8 +79,8 @@ enum Pilot_Type {
 };
 
 #ifdef USE_SIMGEAR
-enum { X, Y, Z };
-enum { Lat, Lon, Alt };
+//enum { X, Y, Z };
+//enum { Lat, Lon, Alt };
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -106,12 +106,12 @@ typedef struct tagCF_Pilot {
     double          px, py, pz;
     double          ppx, ppy, ppz;
 #else // #ifdef USE_SIMGEAR
+#endif // #ifdef USE_SIMGEAR y/n
     Point3D         SenderPosition;
     Point3D         PrevPos;
     Point3D         SenderOrientation;
     Point3D         GeodPoint;
-    Point3D  linearVel, angularVel,  linearAccel, angularAccel;      
-#endif // #ifdef USE_SIMGEAR y/n
+    Point3D  linearVel, angularVel, linearAccel, angularAccel;
     int SenderAddress, SenderPort;
     int             packetCount, packetsDiscarded;
     double          heading, pitch, roll, speed;
