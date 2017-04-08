@@ -15,6 +15,7 @@
 #include <stdlib.h> // for malloc(), ...
 #include <string.h> // for strdup(), ...
 #include <vector>
+#include <string>
 #include <time.h>
 #ifndef _MSC_VER
 #include <string.h> // for strcpy(), ...
@@ -43,6 +44,8 @@
 #ifndef SPRTF
 #define SPRTF printf
 #endif
+
+typedef std::vector<std::string> vSTG;
 
 static const char *module = "raw-log";
 #define M2F 3.28084
@@ -75,6 +78,33 @@ static size_t raw_log_remaining = 0;
 static size_t packet_cnt = 0;
 
 static const char *sample = "F:\\Projects\\cf-log\\data\\sampleudp01.log";
+
+static vSTG vWarnings;
+int add_2_list(char *msg)
+{
+    std::string m(msg);
+    std::string s;
+    size_t ii, len = vWarnings.size();
+    for (ii = 0; ii < len; ii++) {
+        s = vWarnings[ii];
+        if (m == s)
+            return 0;
+    }
+    vWarnings.push_back(m);
+    return 1;   // signal it is new and added
+}
+
+void show_warnings()
+{
+    std::string s;
+    size_t ii, len = vWarnings.size();
+    SPRTF("Repeating %d warnings...\n", (int)len);
+    for (ii = 0; ii < len; ii++) {
+        s = vWarnings[ii];
+        SPRTF("%s", s.c_str());
+    }
+}
+
 
 enum Packet_Type {
     pkt_Invalid,    // not used
@@ -149,8 +179,15 @@ void give_help( char *name )
     SPRTF("%s: usage: [options] usr_input\n", module);
     SPRTF("Options:\n");
     SPRTF(" --help  (-h or -?) = This help and exit(0)\n");
+    SPRTF(" --verb[n]     (-v) = Bump or set verbosity to n. Values 0,1,2,5,9 (def=%d)\n", verbosity);
     // TODO: More help
+    SPRTF("\n");
+    SPRTF("Read and decode a raw FGFS mp packet.\n");
 }
+
+#ifndef ISDIGIT
+#define ISDIGIT(a) ((a >= '0') && (a <= '9'))
+#endif
 
 int parse_args( int argc, char **argv )
 {
@@ -169,6 +206,20 @@ int parse_args( int argc, char **argv )
             case '?':
                 give_help(argv[0]);
                 return 2;
+                break;
+            case 'v':
+                verbosity++;
+                sarg++;
+                while (*sarg)
+                {
+                    if (ISDIGIT(*sarg)) {
+                        verbosity = atoi(sarg);
+                        break;
+                    }
+                    if (*sarg == 'v')
+                        verbosity++;
+                    sarg++;
+                }
                 break;
             // TODO: Other arguments
             default:
@@ -603,6 +654,8 @@ Packet_Type Deal_With_Packet(char *packet, int len)
 {
     static CF_Pilot _s_new_pilot;
     static char _s_tdchk[256];
+    static char _s_text[MAX_TEXT_SIZE];
+
     uint32_t        MsgId;
     uint32_t        MsgMagic;
     uint32_t        MsgLen;
@@ -621,6 +674,7 @@ Packet_Type Deal_With_Packet(char *packet, int len)
     char           *pcs;
     int             i;
     char           *pm;
+    char           *cp;
 
     pp = &_s_new_pilot;
     memset(pp, 0, sizeof(CF_Pilot)); // ensure new is ALL zero
@@ -872,6 +926,8 @@ Packet_Type Deal_With_Packet(char *packet, int len)
                 int ival = 0, bval = 0, c = 0;
                 float val = 0.0;
                 uint32_t length = 0;
+                uint32_t txtlen = 0;
+                uint32_t offset = 0;
                 // How we decode the remainder of the property depends on the type
                 switch (plist->type) {
                 case sgp_INT:
@@ -919,6 +975,7 @@ Packet_Type Deal_With_Packet(char *packet, int len)
                     if (length > MAX_TEXT_SIZE)
                         length = MAX_TEXT_SIZE;
                     xdr += length;
+                    txtlen = length;
                     // Now handle the padding
                     while ((length % 4) != 0)
                     {
@@ -927,22 +984,34 @@ Packet_Type Deal_With_Packet(char *packet, int len)
                         //cout << "0";
                     }
                     if (VERB5) {
-                        SPRTF("%u %s %s len %d\n", id, plist->name, type2stg(plist->type), length);
+                        SPRTF("%u %s %s len %d\n", id, plist->name, type2stg(plist->type), txtlen);
                     }
-                    while (length--) {
+                    cp = _s_text;
+                    offset = 0;
+                    while (txtlen--) {
                         int c = XDR_decode<int>(*txd);
+                        cp[offset++] = (char)c;
                         txd++;
                     }
+                    cp[offset] = 0;
+                    if (offset && VERB9)
+                        SPRTF("Text: '%s'\n", cp);
                 }
                 break;
                 default:
-                    SPRTF("%s: Unknown Prop type %d\n", module, (int)id);
+                    cp = GetNxtBuf();
+                    sprintf(cp,"%s: Unknown Prop type %d\n", module, (int)id);
+                    if (add_2_list(cp))
+                        SPRTF("%s", cp);
                     xdr++;
                     break;
                 }
             }
             else {
-                SPRTF("%s: %u: Not in the listsd...\n", module, id);
+                cp = GetNxtBuf();
+                sprintf(cp,"%s: %u: Not in the Prop list...\n", module, id);
+                if (add_2_list(cp))
+                    SPRTF("%s", cp);
             }
 
 
@@ -1175,6 +1244,7 @@ int main( int argc, char **argv )
 
     iret = process_log(); // TODO: actions of app
     show_packet_stats();
+    show_warnings();
 
     return iret;
 }
