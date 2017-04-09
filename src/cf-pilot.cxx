@@ -29,7 +29,11 @@
 #include "sprtf.hxx"
 #include "cf_misc.hxx"
 #include "mpMsgs.hxx"
+#ifdef USE_SIMGEAR
+#include "xdr_lib/tiny_xdr.hxx"
+#else
 #include "tiny_xdr.hxx"
+#endif
 #include "cf-log.hxx"
 #include "cf-pilot.hxx"
 
@@ -287,10 +291,17 @@ Packet_Type Deal_With_Packet( char *packet, int len )
     pp = &_s_new_pilot;
     memset(pp,0,sizeof(CF_Pilot)); // ensure new is ALL zero
     MsgHdr    = (PT_MsgHdr)packet;
+#ifdef USE_SIMGEAR
+    MsgMagic = XDR_decode_uint32(MsgHdr->Magic);
+    MsgId = XDR_decode_uint32(MsgHdr->MsgId);
+    MsgLen = XDR_decode_uint32(MsgHdr->MsgLen);
+    MsgProto = XDR_decode_uint32(MsgHdr->Version);
+#else // !USE_SIMGEAR
     MsgMagic  = XDR_decode<uint32_t> (MsgHdr->Magic);
     MsgId     = XDR_decode<uint32_t> (MsgHdr->MsgId);
     MsgLen    = XDR_decode<uint32_t> (MsgHdr->MsgLen);
     MsgProto  = XDR_decode<uint32_t> (MsgHdr->Version);
+#endif // USE_SIMGEAR y/n
 
     pcs = pp->callsign;
     for (i = 0; i < MAX_CALLSIGN_LEN; i++) {
@@ -324,12 +335,26 @@ Packet_Type Deal_With_Packet( char *packet, int len )
         }
         PosMsg = (T_PositionMsg *) (packet + sizeof(T_MsgHdr));
         pp->prev_time = pp->curr_time;
+#ifdef USE_SIMGEAR
+        pp->sim_time = XDR_decode_double(PosMsg->time); // get SIM time
+#else
         pp->sim_time = XDR_decode64<double> (PosMsg->time); // get SIM time
+#endif
         pm = get_Model(PosMsg->Model);
         strcpy(pp->aircraft,pm);
 
         // SPRTF("%s: POS Packet %d of len %d, buf %d, cs %s, mod %s, time %lf\n", module, packet_cnt, MsgLen, len, pcs, pm, pp->sim_time);
         // get Sender address and port - need patch in fgms to pass this
+#ifdef USE_SIMGEAR
+        pp->SenderAddress = XDR_decode_uint32(MsgHdr->ReplyAddress);
+        pp->SenderPort = XDR_decode_uint32(MsgHdr->ReplyPort);
+        px = XDR_decode_double(PosMsg->position[X]);
+        py = XDR_decode_double(PosMsg->position[Y]);
+        pz = XDR_decode_double(PosMsg->position[Z]);
+        pp->ox = XDR_decode_float(PosMsg->orientation[X]);
+        pp->oy = XDR_decode_float(PosMsg->orientation[Y]);
+        pp->oz = XDR_decode_float(PosMsg->orientation[Z]);
+#else
         pp->SenderAddress = XDR_decode<uint32_t> (MsgHdr->ReplyAddress);
         pp->SenderPort    = XDR_decode<uint32_t> (MsgHdr->ReplyPort);
         px = XDR_decode64<double> (PosMsg->position[X]);
@@ -338,6 +363,7 @@ Packet_Type Deal_With_Packet( char *packet, int len )
         pp->ox = XDR_decode<float> (PosMsg->orientation[X]);
         pp->oy = XDR_decode<float> (PosMsg->orientation[Y]);
         pp->oz = XDR_decode<float> (PosMsg->orientation[Z]);
+#endif
         if ( (px == 0.0) || (py == 0.0) || (pz == 0.0)) {   
             failed_cnt++;
             return pkt_InvPos;
@@ -404,7 +430,7 @@ Packet_Type Deal_With_Packet( char *packet, int len )
 #ifdef USE_SIMGEAR  // TOCHECK SG function to get speed
         SGVec3f linearVel;
         for (unsigned i = 0; i < 3; ++i)
-            linearVel(i) = XDR_decode<float> (PosMsg->linearVel[i]);
+            linearVel(i) = XDR_decode_float(PosMsg->linearVel[i]);
         pp->speed = norm(linearVel) * SG_METER_TO_NM * 3600.0;
 #else // !#ifdef USE_SIMGEAR
         pp->SenderOrientation.Set ( pp->ox, pp->oy, pp->oz );

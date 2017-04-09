@@ -119,7 +119,19 @@ endif ()
 
 # configure_file( ${CMAKE_BINARY_DIR}/config-msvc.h ${CMAKE_BINARY_DIR}/config.h )
 # add_definitions( -DHAVE_CONFIG_H )
-
+##################################################################################
+if (SIMGEAR_FOUND)
+    set(name xdr_lib)
+    set(dir src/xdr_lib)
+    set(${name}_SRCS
+        ${dir}/tiny_xdr.cxx
+        )
+    set(${name}_HDRS
+        ${dir}/tiny_xdr.hxx
+        )
+    add_library(${name} ${LIB_TYPE} ${${name}_SRCS} ${${name}_HDRS})
+    list(APPEND EXTRA_LIBS ${name})
+endif ()
 ##################################################################################
 # CROSSFEED 'MISC' LIBRARY
 set (dir src/cf_lib )

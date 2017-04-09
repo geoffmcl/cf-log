@@ -11,6 +11,8 @@ typedef unsigned long long uint64_t;
 typedef uint32_t    xdr_data_t;      /* 4 Bytes */
 typedef uint64_t    xdr_data2_t;     /* 8 Bytes */
 
+#ifndef USE_SIMGEAR
+
 inline uint16_t sg_bswap_16(uint16_t x) {
     x = (x >> 8) | (x << 8);
     return x;
@@ -44,6 +46,7 @@ inline void sgEndianSwap(uint16_t *x) { *x = sg_bswap_16(*x); }
 inline void sgEndianSwap(uint32_t *x) { *x = sg_bswap_32(*x); }
 inline void sgEndianSwap(uint64_t *x) { *x = sg_bswap_64(*x); }
 
+#endif // USE_SIMGEAR
 
 #define SWAP16(arg) sgIsLittleEndian() ? sg_bswap_16(arg) : arg
 #define SWAP32(arg) sgIsLittleEndian() ? sg_bswap_32(arg) : arg

@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h> // for malloc(), ...
 #include <string.h> // for strdup(), ...
+#include <algorithm> // for std::equal_range, ...
 #include <vector>
 #include <string>
 #include <time.h>
@@ -27,6 +28,7 @@
 #include <simgear/compiler.h>
 #include <simgear/constants.h>
 #include <simgear/math/SGMath.hxx>
+#include <simgear/misc/stdint.hxx>
 #else
 #ifdef USE_GeographicLib
 #include <geod.hxx>
@@ -37,8 +39,11 @@
 #include "cf_euler.hxx"
 #include "sprtf.hxx"
 #include "mpMsgs.hxx"
+#ifdef USE_SIMGEAR
+#include "xdr_lib/tiny_xdr.hxx"
+#else
 #include "tiny_xdr.hxx"
-#include "mpMsgs.hxx"
+#endif
 #include "cf_misc.hxx"
 
 #ifndef SPRTF
@@ -46,6 +51,7 @@
 #endif
 
 typedef std::vector<std::string> vSTG;
+typedef std::vector<uint32_t>   vUINT;
 
 static const char *module = "raw-log";
 #define M2F 3.28084
@@ -59,7 +65,7 @@ static const char *module = "raw-log";
 #define MAX_PACKET_SIZE 1200
 #define MAX_TEXT_SIZE 128
 
-static int verbosity = 0;
+static int verbosity = 1;
 #define VERB1 (verbosity >= 1)
 #define VERB2 (verbosity >= 2)
 #define VERB5 (verbosity >= 5)
@@ -94,11 +100,28 @@ int add_2_list(char *msg)
     return 1;   // signal it is new and added
 }
 
+static vUINT vIdsUsed;
+int add_2_ids(uint32_t id)
+{
+    size_t ii, len = vIdsUsed.size();
+    uint32_t ui;
+    for (ii = 0; ii < len; ii++) {
+        ui = vIdsUsed[ii];
+        if (ui == id)
+            return 0;
+    }
+    vIdsUsed.push_back(id);
+    return 1;
+}
+
 void show_warnings()
 {
     std::string s;
     size_t ii, len = vWarnings.size();
-    SPRTF("Repeating %d warnings...\n", (int)len);
+    if (len || VERB1)
+    {
+        SPRTF("Repeating %d warnings...\n", (int)len);
+    }
     for (ii = 0; ii < len; ii++) {
         s = vWarnings[ii];
         SPRTF("%s", s.c_str());
@@ -154,35 +177,49 @@ PPKTSTR Get_Pkt_Str() { return &sPktStr[0]; }
 
 static void show_packet_stats()
 {
-    int i, cnt, PacketCount, Bad_Packets, DiscardCount;
-    PPKTSTR pps = Get_Pkt_Str();
+    //if (VERB1)
+    //{
+        int i, cnt, PacketCount, Bad_Packets, DiscardCount;
+        PPKTSTR pps = Get_Pkt_Str();
 
-    PacketCount = 0;
-    Bad_Packets = 0;
-    DiscardCount = pps[pkt_Discards].count;
-    for (i = 0; i < pkt_Max; i++) {
-        cnt = pps[i].count;
-        PacketCount += cnt;
-        if (i < pkt_First)
-            Bad_Packets += cnt;
-        if (cnt) {
-            SPRTF("%s %d ", pps[i].desc, cnt);
+        PacketCount = 0;
+        Bad_Packets = 0;
+        DiscardCount = pps[pkt_Discards].count;
+        for (i = 0; i < pkt_Max; i++) {
+            cnt = pps[i].count;
+            PacketCount += cnt;
+            if (i < pkt_First)
+                Bad_Packets += cnt;
+            if (cnt) {
+                SPRTF("%s %d ", pps[i].desc, cnt);
+            }
         }
-    }
-    SPRTF("Total %d, Discarded %d, Bad %d\n", PacketCount, DiscardCount, Bad_Packets);
-
+        SPRTF("Total %d, Discarded %d, Bad %d\n", PacketCount, DiscardCount, Bad_Packets);
+    //}
 }
 
 
 void give_help( char *name )
 {
-    SPRTF("%s: usage: [options] usr_input\n", module);
+    SPRTF("\n");
+    SPRTF("Usage:\n");
+    SPRTF(" %s [options] usr_input\n", module);
+    SPRTF("\n");
     SPRTF("Options:\n");
     SPRTF(" --help  (-h or -?) = This help and exit(0)\n");
     SPRTF(" --verb[n]     (-v) = Bump or set verbosity to n. Values 0,1,2,5,9 (def=%d)\n", verbosity);
     // TODO: More help
     SPRTF("\n");
-    SPRTF("Read and decode a raw FGFS mp packet.\n");
+    SPRTF("Description:\n");
+    SPRTF(" Read and decode a raw log of FGFS mp packets, and output information found.\n");
+    SPRTF(" To be fully effective, this utility needs to link with SimGearCore.lib, but has some\n");
+    SPRTF(" not so well tested alterative maths and xdr decoding available.\n");
+    SPRTF("\n");
+    SPRTF("Note:\n");
+    SPRTF(" The udp-recv, from the https://github.com/geoffmcl/tcp-tests/ repository can be used\n");
+    SPRTF(" as an easy way to capture a raw log of FGFS mp packets, as well as probably many other\n");
+    SPRTF(" tools and utilities.\n");
+    SPRTF("\n");
 }
 
 #ifndef ISDIGIT
@@ -319,7 +356,8 @@ static int same_count = 0;
 // show_pilot 
 void print_pilot(PCF_Pilot pp, char *pm, Pilot_Type pt)
 {
-    // if (!VERB9) return;
+    if (!VERB1)
+        return;
     char * cp = GetNxtBuf();
     //struct in_addr in;
     int ialt;
@@ -424,6 +462,7 @@ static T2STG t2stg[]{
     { sgp_UNKNOW, 0 }
 };
 
+#ifndef USE_SIMGEAR
 static const char *type2stg(sgp_Type t)
 {
     PT2STG pts = t2stg;
@@ -434,8 +473,497 @@ static const char *type2stg(sgp_Type t)
     }
     return "UNKNOWN";
 }
+#endif 
 
 ////////////////////////////////////////////////////////////////////////////////////
+// *********************************************************************************
+#define USE_PROTO_2
+
+#ifdef USE_PROTO_2
+
+namespace simgear
+{
+    namespace props
+    {
+        /**
+        * The possible types of an SGPropertyNode. Types that appear after
+        * EXTENDED are not stored in the SGPropertyNode itself.
+        */
+        enum Type {
+            NONE = 0, /**< The node hasn't been assigned a value yet. */
+            ALIAS, /**< The node "points" to another node. */
+            BOOL,
+            INT,
+            LONG,
+            FLOAT,
+            DOUBLE,
+            STRING,
+            UNSPECIFIED,
+            EXTENDED, /**< The node's value is not stored in the property;
+                      * the actual value and type is retrieved from an
+                      * SGRawValue node. This type is never returned by @see
+                      * SGPropertyNode::getType.
+                      */
+                      // Extended properties
+                      VEC3D,
+                      VEC4D
+        };
+
+        template<typename T> struct PropertyTraits;
+
+#define DEFINTERNALPROP(TYPE, PROP) \
+template<> \
+struct PropertyTraits<TYPE> \
+{ \
+    static const Type type_tag = PROP; \
+    enum  { Internal = 1 }; \
+}
+
+        DEFINTERNALPROP(bool, BOOL);
+        DEFINTERNALPROP(int, INT);
+        DEFINTERNALPROP(long, LONG);
+        DEFINTERNALPROP(float, FLOAT);
+        DEFINTERNALPROP(double, DOUBLE);
+        DEFINTERNALPROP(const char *, STRING);
+        DEFINTERNALPROP(const char[], STRING);
+#undef DEFINTERNALPROP
+
+    };
+
+};
+
+static const char *type2stg(simgear::props::Type t)
+{
+    return "?";
+}
+
+struct FGPropertyData {
+    unsigned id;
+
+    // While the type isn't transmitted, it is needed for the destructor
+    simgear::props::Type type;
+    union {
+        int int_value;
+        float float_value;
+        char* string_value;
+    };
+
+    ~FGPropertyData() {
+        if ((type == simgear::props::STRING) || (type == simgear::props::UNSPECIFIED))
+        {
+            delete[] string_value;
+        }
+    }
+};
+
+
+
+/*
+* With the MP2017(V2) protocol it should be possible to transmit using a different type/encoding than the property has,
+* so it should be possible to transmit a bool as
+*/
+enum TransmissionType {
+    TT_ASIS = 0, // transmit as defined in the property. This is the default
+    TT_BOOL = simgear::props::BOOL,
+    TT_INT = simgear::props::INT,
+    TT_FLOAT = simgear::props::FLOAT,
+    TT_STRING = simgear::props::STRING,
+    TT_SHORTINT = 0x100,
+    TT_SHORT_FLOAT_NORM = 0x101, // -1 .. 1 encoded into a short int (16 bit)
+    TT_SHORT_FLOAT_1 = 0x102, //range -3276.7 .. 3276.7  float encoded into a short int (16 bit) 
+    TT_SHORT_FLOAT_2 = 0x103, //range -327.67 .. 327.67  float encoded into a short int (16 bit) 
+    TT_SHORT_FLOAT_3 = 0x104, //range -32.767 .. 32.767  float encoded into a short int (16 bit) 
+    TT_SHORT_FLOAT_4 = 0x105, //range -3.2767 .. 3.2767  float encoded into a short int (16 bit) 
+    TT_BOOLARRAY,
+    TT_CHAR,
+};
+/*
+* Definitions for the version of the protocol to use to transmit the items defined in the IdPropertyList
+*
+* The MP2017(V2) protocol allows for much better packing of strings, new types that are transmitted in 4bytes by transmitting
+* with short int (sometimes scaled) for the values (a lot of the properties that are transmitted will pack nicely into 16bits).
+* The MP2017(V2) protocol also allows for properties to be transmitted automatically as a different type and the encode/decode will
+* take this into consideration.
+* The pad magic is used to force older clients to use verifyProperties and as the first property transmitted is short int encoded it
+* will cause the rest of the packet to be discarded. This is the section of the packet that contains the properties defined in the list
+* here - the basic motion properties remain compatible, so the older client will see just the model, not chat, not animations etc.
+*/
+const int V1_1_PROP_ID = 1;
+const int V1_1_2_PROP_ID = 2;
+const int V2_PAD_MAGIC = 0x1face002;
+
+/*
+* definition of properties that are to be transmitted.
+* New for 2017.2:
+* 1. TransmitAs - this causes the property to be transmitted on the wire using the
+*    specified format transparently.
+* 2. version - the minimum version of the protocol that is required to transmit a property.
+*    Does not apply to incoming properties - as these will be decoded correctly when received
+* 3. Convert; not implemented. Planned to allow property specific conversion rules to be applied
+*/
+struct IdPropertyList {
+    unsigned id;
+    const char* name;
+    simgear::props::Type type;
+    TransmissionType TransmitAs;
+    int version;
+    int(*convert)(int direction, xdr_data_t*, FGPropertyData*);
+};
+
+static const IdPropertyList* findProperty(unsigned id);
+
+/*
+* not yet used method to avoid transmitting a string for something that should always have been
+* an integer
+*/
+static int convert_launchbar_state(int direction, xdr_data_t*, FGPropertyData*)
+{
+    return 0; // no conversion performed
+}
+
+// A static map of protocol property id values to property paths,
+// This should be extendable dynamically for every specific aircraft ...
+// For now only that static list
+static const IdPropertyList sIdPropertyList[] = {
+    { 10,  "sim/multiplay/protocol-version",          simgear::props::INT,   TT_SHORTINT,  V1_1_PROP_ID, NULL },
+    { 100, "surface-positions/left-aileron-pos-norm",  simgear::props::FLOAT, TT_SHORT_FLOAT_NORM,  V1_1_PROP_ID, NULL },
+    { 101, "surface-positions/right-aileron-pos-norm", simgear::props::FLOAT, TT_SHORT_FLOAT_NORM,  V1_1_PROP_ID, NULL },
+    { 102, "surface-positions/elevator-pos-norm",      simgear::props::FLOAT, TT_SHORT_FLOAT_NORM,  V1_1_PROP_ID, NULL },
+    { 103, "surface-positions/rudder-pos-norm",        simgear::props::FLOAT, TT_SHORT_FLOAT_NORM,  V1_1_PROP_ID, NULL },
+    { 104, "surface-positions/flap-pos-norm",          simgear::props::FLOAT, TT_SHORT_FLOAT_NORM,  V1_1_PROP_ID, NULL },
+    { 105, "surface-positions/speedbrake-pos-norm",    simgear::props::FLOAT, TT_SHORT_FLOAT_NORM,  V1_1_PROP_ID, NULL },
+    { 106, "gear/tailhook/position-norm",              simgear::props::FLOAT, TT_SHORT_FLOAT_NORM,  V1_1_PROP_ID, NULL },
+    { 107, "gear/launchbar/position-norm",             simgear::props::FLOAT, TT_SHORT_FLOAT_NORM,  V1_1_PROP_ID, NULL },
+    { 108, "gear/launchbar/state",                     simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+    { 109, "gear/launchbar/holdback-position-norm",    simgear::props::FLOAT, TT_SHORT_FLOAT_NORM,  V1_1_PROP_ID, NULL },
+    { 110, "canopy/position-norm",                     simgear::props::FLOAT, TT_SHORT_FLOAT_NORM,  V1_1_PROP_ID, NULL },
+    { 111, "surface-positions/wing-pos-norm",          simgear::props::FLOAT, TT_SHORT_FLOAT_NORM,  V1_1_PROP_ID, NULL },
+    { 112, "surface-positions/wing-fold-pos-norm",     simgear::props::FLOAT, TT_SHORT_FLOAT_NORM,  V1_1_PROP_ID, NULL },
+
+    { 200, "gear/gear[0]/compression-norm",           simgear::props::FLOAT, TT_SHORT_FLOAT_NORM,  V1_1_PROP_ID, NULL },
+    { 201, "gear/gear[0]/position-norm",              simgear::props::FLOAT, TT_SHORT_FLOAT_NORM,  V1_1_PROP_ID, NULL },
+    { 210, "gear/gear[1]/compression-norm",           simgear::props::FLOAT, TT_SHORT_FLOAT_NORM,  V1_1_PROP_ID, NULL },
+    { 211, "gear/gear[1]/position-norm",              simgear::props::FLOAT, TT_SHORT_FLOAT_NORM,  V1_1_PROP_ID, NULL },
+    { 220, "gear/gear[2]/compression-norm",           simgear::props::FLOAT, TT_SHORT_FLOAT_NORM,  V1_1_PROP_ID, NULL },
+    { 221, "gear/gear[2]/position-norm",              simgear::props::FLOAT, TT_SHORT_FLOAT_NORM,  V1_1_PROP_ID, NULL },
+    { 230, "gear/gear[3]/compression-norm",           simgear::props::FLOAT, TT_SHORT_FLOAT_NORM,  V1_1_PROP_ID, NULL },
+    { 231, "gear/gear[3]/position-norm",              simgear::props::FLOAT, TT_SHORT_FLOAT_NORM,  V1_1_PROP_ID, NULL },
+    { 240, "gear/gear[4]/compression-norm",           simgear::props::FLOAT, TT_SHORT_FLOAT_NORM,  V1_1_PROP_ID, NULL },
+    { 241, "gear/gear[4]/position-norm",              simgear::props::FLOAT, TT_SHORT_FLOAT_NORM,  V1_1_PROP_ID, NULL },
+
+    { 300, "engines/engine[0]/n1",  simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 301, "engines/engine[0]/n2",  simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 302, "engines/engine[0]/rpm", simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 310, "engines/engine[1]/n1",  simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 311, "engines/engine[1]/n2",  simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 312, "engines/engine[1]/rpm", simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 320, "engines/engine[2]/n1",  simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 321, "engines/engine[2]/n2",  simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 322, "engines/engine[2]/rpm", simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 330, "engines/engine[3]/n1",  simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 331, "engines/engine[3]/n2",  simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 332, "engines/engine[3]/rpm", simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 340, "engines/engine[4]/n1",  simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 341, "engines/engine[4]/n2",  simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 342, "engines/engine[4]/rpm", simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 350, "engines/engine[5]/n1",  simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 351, "engines/engine[5]/n2",  simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 352, "engines/engine[5]/rpm", simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 360, "engines/engine[6]/n1",  simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 361, "engines/engine[6]/n2",  simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 362, "engines/engine[6]/rpm", simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 370, "engines/engine[7]/n1",  simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 371, "engines/engine[7]/n2",  simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 372, "engines/engine[7]/rpm", simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 380, "engines/engine[8]/n1",  simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 381, "engines/engine[8]/n2",  simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 382, "engines/engine[8]/rpm", simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 390, "engines/engine[9]/n1",  simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 391, "engines/engine[9]/n2",  simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 392, "engines/engine[9]/rpm", simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+
+    { 800, "rotors/main/rpm", simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 801, "rotors/tail/rpm", simgear::props::FLOAT, TT_SHORT_FLOAT_1,  V1_1_PROP_ID, NULL },
+    { 810, "rotors/main/blade[0]/position-deg",  simgear::props::FLOAT, TT_SHORT_FLOAT_3,  V1_1_PROP_ID, NULL },
+    { 811, "rotors/main/blade[1]/position-deg",  simgear::props::FLOAT, TT_SHORT_FLOAT_3,  V1_1_PROP_ID, NULL },
+    { 812, "rotors/main/blade[2]/position-deg",  simgear::props::FLOAT, TT_SHORT_FLOAT_3,  V1_1_PROP_ID, NULL },
+    { 813, "rotors/main/blade[3]/position-deg",  simgear::props::FLOAT, TT_SHORT_FLOAT_3,  V1_1_PROP_ID, NULL },
+    { 820, "rotors/main/blade[0]/flap-deg",  simgear::props::FLOAT, TT_SHORT_FLOAT_3,  V1_1_PROP_ID, NULL },
+    { 821, "rotors/main/blade[1]/flap-deg",  simgear::props::FLOAT, TT_SHORT_FLOAT_3,  V1_1_PROP_ID, NULL },
+    { 822, "rotors/main/blade[2]/flap-deg",  simgear::props::FLOAT, TT_SHORT_FLOAT_3,  V1_1_PROP_ID, NULL },
+    { 823, "rotors/main/blade[3]/flap-deg",  simgear::props::FLOAT, TT_SHORT_FLOAT_3,  V1_1_PROP_ID, NULL },
+    { 830, "rotors/tail/blade[0]/position-deg",  simgear::props::FLOAT, TT_SHORT_FLOAT_3,  V1_1_PROP_ID, NULL },
+    { 831, "rotors/tail/blade[1]/position-deg",  simgear::props::FLOAT, TT_SHORT_FLOAT_3,  V1_1_PROP_ID, NULL },
+
+    { 900, "sim/hitches/aerotow/tow/length",                       simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 901, "sim/hitches/aerotow/tow/elastic-constant",             simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 902, "sim/hitches/aerotow/tow/weight-per-m-kg-m",            simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 903, "sim/hitches/aerotow/tow/dist",                         simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 904, "sim/hitches/aerotow/tow/connected-to-property-node",   simgear::props::BOOL, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 905, "sim/hitches/aerotow/tow/connected-to-ai-or-mp-callsign",   simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+    { 906, "sim/hitches/aerotow/tow/brake-force",                  simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 907, "sim/hitches/aerotow/tow/end-force-x",                  simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 908, "sim/hitches/aerotow/tow/end-force-y",                  simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 909, "sim/hitches/aerotow/tow/end-force-z",                  simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 930, "sim/hitches/aerotow/is-slave",                         simgear::props::BOOL, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 931, "sim/hitches/aerotow/speed-in-tow-direction",           simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 932, "sim/hitches/aerotow/open",                             simgear::props::BOOL, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 933, "sim/hitches/aerotow/local-pos-x",                      simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 934, "sim/hitches/aerotow/local-pos-y",                      simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 935, "sim/hitches/aerotow/local-pos-z",                      simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+
+    { 1001, "controls/flight/slats",  simgear::props::FLOAT, TT_SHORT_FLOAT_4,  V1_1_PROP_ID, NULL },
+    { 1002, "controls/flight/speedbrake",  simgear::props::FLOAT, TT_SHORT_FLOAT_4,  V1_1_PROP_ID, NULL },
+    { 1003, "controls/flight/spoilers",  simgear::props::FLOAT, TT_SHORT_FLOAT_4,  V1_1_PROP_ID, NULL },
+    { 1004, "controls/gear/gear-down",  simgear::props::FLOAT, TT_SHORT_FLOAT_4,  V1_1_PROP_ID, NULL },
+    { 1005, "controls/lighting/nav-lights",  simgear::props::FLOAT, TT_SHORT_FLOAT_3,  V1_1_PROP_ID, NULL },
+    { 1006, "controls/armament/station[0]/jettison-all",  simgear::props::BOOL, TT_SHORTINT,  V1_1_PROP_ID, NULL },
+
+    { 1100, "sim/model/variant", simgear::props::INT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 1101, "sim/model/livery/file", simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+
+    { 1200, "environment/wildfire/data", simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+    { 1201, "environment/contrail", simgear::props::INT, TT_SHORTINT,  V1_1_PROP_ID, NULL },
+
+    { 1300, "tanker", simgear::props::INT, TT_SHORTINT,  V1_1_PROP_ID, NULL },
+
+    { 1400, "scenery/events", simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+
+    { 1500, "instrumentation/transponder/transmitted-id", simgear::props::INT, TT_SHORTINT,  V1_1_PROP_ID, NULL },
+    { 1501, "instrumentation/transponder/altitude", simgear::props::INT, TT_ASIS,  TT_SHORTINT, NULL },
+    { 1502, "instrumentation/transponder/ident", simgear::props::BOOL, TT_ASIS,  TT_SHORTINT, NULL },
+    { 1503, "instrumentation/transponder/inputs/mode", simgear::props::INT, TT_ASIS,  TT_SHORTINT, NULL },
+
+    { 10001, "sim/multiplay/transmission-freq-hz",  simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+    { 10002, "sim/multiplay/chat",  simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+
+    { 10100, "sim/multiplay/generic/string[0]", simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+    { 10101, "sim/multiplay/generic/string[1]", simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+    { 10102, "sim/multiplay/generic/string[2]", simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+    { 10103, "sim/multiplay/generic/string[3]", simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+    { 10104, "sim/multiplay/generic/string[4]", simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+    { 10105, "sim/multiplay/generic/string[5]", simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+    { 10106, "sim/multiplay/generic/string[6]", simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+    { 10107, "sim/multiplay/generic/string[7]", simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+    { 10108, "sim/multiplay/generic/string[8]", simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+    { 10109, "sim/multiplay/generic/string[9]", simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+    { 10110, "sim/multiplay/generic/string[10]", simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+    { 10111, "sim/multiplay/generic/string[11]", simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+    { 10112, "sim/multiplay/generic/string[12]", simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+    { 10113, "sim/multiplay/generic/string[13]", simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+    { 10114, "sim/multiplay/generic/string[14]", simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+    { 10115, "sim/multiplay/generic/string[15]", simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+    { 10116, "sim/multiplay/generic/string[16]", simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+    { 10117, "sim/multiplay/generic/string[17]", simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+    { 10118, "sim/multiplay/generic/string[18]", simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+    { 10119, "sim/multiplay/generic/string[19]", simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
+
+    { 10200, "sim/multiplay/generic/float[0]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10201, "sim/multiplay/generic/float[1]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10202, "sim/multiplay/generic/float[2]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10203, "sim/multiplay/generic/float[3]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10204, "sim/multiplay/generic/float[4]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10205, "sim/multiplay/generic/float[5]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10206, "sim/multiplay/generic/float[6]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10207, "sim/multiplay/generic/float[7]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10208, "sim/multiplay/generic/float[8]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10209, "sim/multiplay/generic/float[9]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10210, "sim/multiplay/generic/float[10]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10211, "sim/multiplay/generic/float[11]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10212, "sim/multiplay/generic/float[12]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10213, "sim/multiplay/generic/float[13]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10214, "sim/multiplay/generic/float[14]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10215, "sim/multiplay/generic/float[15]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10216, "sim/multiplay/generic/float[16]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10217, "sim/multiplay/generic/float[17]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10218, "sim/multiplay/generic/float[18]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10219, "sim/multiplay/generic/float[19]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+
+    { 10220, "sim/multiplay/generic/float[20]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10221, "sim/multiplay/generic/float[21]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10222, "sim/multiplay/generic/float[22]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10223, "sim/multiplay/generic/float[23]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10224, "sim/multiplay/generic/float[24]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10225, "sim/multiplay/generic/float[25]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10226, "sim/multiplay/generic/float[26]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10227, "sim/multiplay/generic/float[27]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10228, "sim/multiplay/generic/float[28]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10229, "sim/multiplay/generic/float[29]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10230, "sim/multiplay/generic/float[30]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10231, "sim/multiplay/generic/float[31]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10232, "sim/multiplay/generic/float[32]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10233, "sim/multiplay/generic/float[33]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10234, "sim/multiplay/generic/float[34]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10235, "sim/multiplay/generic/float[35]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10236, "sim/multiplay/generic/float[36]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10237, "sim/multiplay/generic/float[37]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10238, "sim/multiplay/generic/float[38]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10239, "sim/multiplay/generic/float[39]", simgear::props::FLOAT, TT_ASIS,  V1_1_PROP_ID, NULL },
+
+    { 10300, "sim/multiplay/generic/int[0]", simgear::props::INT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10301, "sim/multiplay/generic/int[1]", simgear::props::INT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10302, "sim/multiplay/generic/int[2]", simgear::props::INT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10303, "sim/multiplay/generic/int[3]", simgear::props::INT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10304, "sim/multiplay/generic/int[4]", simgear::props::INT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10305, "sim/multiplay/generic/int[5]", simgear::props::INT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10306, "sim/multiplay/generic/int[6]", simgear::props::INT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10307, "sim/multiplay/generic/int[7]", simgear::props::INT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10308, "sim/multiplay/generic/int[8]", simgear::props::INT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10309, "sim/multiplay/generic/int[9]", simgear::props::INT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10310, "sim/multiplay/generic/int[10]", simgear::props::INT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10311, "sim/multiplay/generic/int[11]", simgear::props::INT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10312, "sim/multiplay/generic/int[12]", simgear::props::INT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10313, "sim/multiplay/generic/int[13]", simgear::props::INT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10314, "sim/multiplay/generic/int[14]", simgear::props::INT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10315, "sim/multiplay/generic/int[15]", simgear::props::INT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10316, "sim/multiplay/generic/int[16]", simgear::props::INT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10317, "sim/multiplay/generic/int[17]", simgear::props::INT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10318, "sim/multiplay/generic/int[18]", simgear::props::INT, TT_ASIS,  V1_1_PROP_ID, NULL },
+    { 10319, "sim/multiplay/generic/int[19]", simgear::props::INT, TT_ASIS,  V1_1_PROP_ID, NULL },
+
+    { 10500, "sim/multiplay/generic/short[0]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10501, "sim/multiplay/generic/short[1]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10502, "sim/multiplay/generic/short[2]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10503, "sim/multiplay/generic/short[3]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10504, "sim/multiplay/generic/short[4]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10505, "sim/multiplay/generic/short[5]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10506, "sim/multiplay/generic/short[6]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10507, "sim/multiplay/generic/short[7]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10508, "sim/multiplay/generic/short[8]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10509, "sim/multiplay/generic/short[9]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10510, "sim/multiplay/generic/short[10]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10511, "sim/multiplay/generic/short[11]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10512, "sim/multiplay/generic/short[12]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10513, "sim/multiplay/generic/short[13]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10514, "sim/multiplay/generic/short[14]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10515, "sim/multiplay/generic/short[15]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10516, "sim/multiplay/generic/short[16]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10517, "sim/multiplay/generic/short[17]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10518, "sim/multiplay/generic/short[18]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10519, "sim/multiplay/generic/short[19]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10520, "sim/multiplay/generic/short[20]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10521, "sim/multiplay/generic/short[21]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10522, "sim/multiplay/generic/short[22]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10523, "sim/multiplay/generic/short[23]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10524, "sim/multiplay/generic/short[24]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10525, "sim/multiplay/generic/short[25]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10526, "sim/multiplay/generic/short[26]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10527, "sim/multiplay/generic/short[27]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10528, "sim/multiplay/generic/short[28]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10529, "sim/multiplay/generic/short[29]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10520, "sim/multiplay/generic/short[20]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10521, "sim/multiplay/generic/short[21]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10522, "sim/multiplay/generic/short[22]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10523, "sim/multiplay/generic/short[23]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10524, "sim/multiplay/generic/short[24]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10525, "sim/multiplay/generic/short[25]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10526, "sim/multiplay/generic/short[26]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10527, "sim/multiplay/generic/short[27]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10528, "sim/multiplay/generic/short[28]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10529, "sim/multiplay/generic/short[29]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10530, "sim/multiplay/generic/short[30]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10531, "sim/multiplay/generic/short[31]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10532, "sim/multiplay/generic/short[32]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10533, "sim/multiplay/generic/short[33]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10534, "sim/multiplay/generic/short[34]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10535, "sim/multiplay/generic/short[35]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10536, "sim/multiplay/generic/short[36]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10537, "sim/multiplay/generic/short[37]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10538, "sim/multiplay/generic/short[38]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10539, "sim/multiplay/generic/short[39]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10540, "sim/multiplay/generic/short[40]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10541, "sim/multiplay/generic/short[41]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10542, "sim/multiplay/generic/short[42]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10543, "sim/multiplay/generic/short[43]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10544, "sim/multiplay/generic/short[44]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10545, "sim/multiplay/generic/short[45]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10546, "sim/multiplay/generic/short[46]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10547, "sim/multiplay/generic/short[47]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10548, "sim/multiplay/generic/short[48]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10549, "sim/multiplay/generic/short[49]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10550, "sim/multiplay/generic/short[50]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10551, "sim/multiplay/generic/short[51]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10552, "sim/multiplay/generic/short[52]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10553, "sim/multiplay/generic/short[53]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10554, "sim/multiplay/generic/short[54]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10555, "sim/multiplay/generic/short[55]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10556, "sim/multiplay/generic/short[56]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10557, "sim/multiplay/generic/short[57]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10558, "sim/multiplay/generic/short[58]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10559, "sim/multiplay/generic/short[59]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10560, "sim/multiplay/generic/short[60]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10561, "sim/multiplay/generic/short[61]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10562, "sim/multiplay/generic/short[62]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10563, "sim/multiplay/generic/short[63]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10564, "sim/multiplay/generic/short[64]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10565, "sim/multiplay/generic/short[65]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10566, "sim/multiplay/generic/short[66]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10567, "sim/multiplay/generic/short[67]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10568, "sim/multiplay/generic/short[68]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10569, "sim/multiplay/generic/short[69]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10570, "sim/multiplay/generic/short[70]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10571, "sim/multiplay/generic/short[71]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10572, "sim/multiplay/generic/short[72]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10573, "sim/multiplay/generic/short[73]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10574, "sim/multiplay/generic/short[74]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10575, "sim/multiplay/generic/short[75]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10576, "sim/multiplay/generic/short[76]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10577, "sim/multiplay/generic/short[77]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10578, "sim/multiplay/generic/short[78]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+    { 10579, "sim/multiplay/generic/short[79]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
+
+};
+/*
+* For the 2017.x version 2 protocol the properties are sent in two partitions,
+* the first of these is a V1 protocol packet (which should be fine with all clients), and a V2 partition
+* which will contain the newly supported shortint and fixed string encoding schemes.
+* This is to possibly allow for easier V1/V2 conversion - as the packet can simply be truncated at the
+* first V2 property based on ID.
+*/
+const int MAX_PARTITIONS = 2;
+const unsigned int numProperties = (sizeof(sIdPropertyList) / sizeof(sIdPropertyList[0]));
+
+// Look up a property ID using binary search.
+namespace
+{
+    struct ComparePropertyId
+    {
+        bool operator()(const IdPropertyList& lhs,
+            const IdPropertyList& rhs)
+        {
+            return lhs.id < rhs.id;
+        }
+        bool operator()(const IdPropertyList& lhs,
+            unsigned id)
+        {
+            return lhs.id < id;
+        }
+        bool operator()(unsigned id,
+            const IdPropertyList& rhs)
+        {
+            return id < rhs.id;
+        }
+    };
+}
+
+const IdPropertyList* findProperty(unsigned id)
+{
+    std::pair<const IdPropertyList*, const IdPropertyList*> result
+        = std::equal_range(sIdPropertyList, sIdPropertyList + numProperties, id,
+            ComparePropertyId());
+    if (result.first == result.second) {
+        return 0;
+    }
+    else {
+        return result.first;
+    }
+}
+
+
+
+
+#else // !USE PROTO_2
+
 struct IdPropertyList {
     unsigned id;
     const char* name;
@@ -635,7 +1163,7 @@ static const IdPropertyList* findProperty(unsigned id) {
     return 0;
 }
 
-
+#endif // USE_PROTO_2 y/n
 
 ////////////////////////////////////////////////////////////////////////////////////
 #ifdef USE_SIMGEAR  // TOCHECK SETPREVPOS MACRO
@@ -650,12 +1178,338 @@ static const IdPropertyList* findProperty(unsigned id) {
 static double elapsed_sim_time = 0.0;
 static bool got_sim_time = false;
 
+#ifdef USE_PROTO_2
+void Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * propsEnd)
+{
+    static char _s_text[MAX_TEXT_SIZE];
+    char *cp;
+    while (xdr < msgEnd) {
+        // First element is always the ID
+        // int id = XDR_decode<int>(*xdr);
+#ifdef USE_SIMGEAR
+        unsigned id = XDR_decode_uint32(*xdr);
+        /*
+        * As we can detect a short int encoded value (by the upper word being non-zero) we can
+        * do the decode here; set the id correctly, extract the integer and set the flag.
+        * This can then be picked up by the normal processing based on the flag
+        */
+        int int_value = 0;
+        bool short_int_encoded = false;
+        if (id & 0xffff0000)
+        {
+            int v1, v2;
+            XDR_decode_shortints32(*xdr, v1, v2);
+            int_value = v2;
+            id = v1;
+            short_int_encoded = true;
+        }
+#else 
+        unsigned id = XDR_decode<int>(*xdr);
+#endif
+        //cout << pData->id << " ";
+        xdr++;
+        const IdPropertyList* plist = findProperty(id);
+        if (plist) {
+            const char *dt = "UNK";
+            int ival = 0, bval = 0, c = 0;
+            double val = 0.0;
+            uint32_t length = 0;
+            uint32_t txtlen = 0;
+            uint32_t offset = 0;
+            add_2_ids(id);
+            // How we decode the remainder of the property depends on the type
+            switch (plist->type) {
+            case simgear::props::INT:
+            case simgear::props::BOOL:
+            case simgear::props::LONG:
+                if (short_int_encoded)
+                {
+                    ival = int_value;
+                    dt = "EINT";
+                    //pData->type = simgear::props::INT;
+                }
+                else
+                {
+                    ival = XDR_decode_uint32(*xdr);
+                    xdr++;
+                    dt = "INT";
+                }
+                if (VERB5) {
+                    SPRTF("%u %s %s %d\n", id, plist->name, dt, ival);
+                }
+                //cout << pData->int_value << "\n";
+                break;
+            case simgear::props::FLOAT:
+            case simgear::props::DOUBLE:
+                if (short_int_encoded)
+                {
+                    switch (plist->TransmitAs)
+                    {
+                    case TT_SHORT_FLOAT_1:
+                        val = (double)int_value / 10.0;
+                        // pData->float_value = (double)int_value / 10.0;
+                        dt = "FLOAT_1";
+                        break;
+                    case TT_SHORT_FLOAT_2:
+                        val = (double)int_value / 100.0;
+                        dt = "FLOAT_2";
+                        break;
+                    case TT_SHORT_FLOAT_3:
+                        val = (double)int_value / 1000.0;
+                        dt = "FLOAT_3";
+                        break;
+                    case TT_SHORT_FLOAT_4:
+                        val = (double)int_value / 10000.0;
+                        dt = "FLOAT_4";
+                        break;
+                    case TT_SHORT_FLOAT_NORM:
+                        val = (double)int_value / 32767.0;
+                        dt = "FLOAT_N";
+                        break;
+                    default:
+                        break;
+                    }
+                }
+                else
+                {
+                    val = XDR_decode_float(*xdr);
+                    xdr++;
+                    dt = "FLOAT";
+                }
+                if (VERB5) {
+                    SPRTF("%u %s %s %lf\n", id, plist->name, dt, val);
+                }
+                break;
+            case simgear::props::STRING:
+            case simgear::props::UNSPECIFIED:
+                // if the string is using short int encoding then it is in the new format.
+                if (short_int_encoded)
+                {
+                    uint32_t length = int_value;
+                    //pData->string_value = new char[length + 1];
+                    cp = _s_text;
+                    char *cptr = (char*)xdr;
+                    for (unsigned i = 0; i < length; i++)
+                    {
+                        //pData->string_value[i] = *cptr++;
+                        cp[i] = *cptr++;
+                    }
+                    //pData->string_value[length] = '\0';
+                    cp[length] = 0;
+                    xdr = (xdr_data_t*)cptr;
+                    dt = "STRING_N";
+                }
+                else {
+                    // String is complicated. It consists of
+                    // The length of the string
+                    // The string itself
+                    // Padding to the nearest 4-bytes.    
+                    uint32_t length = XDR_decode_uint32(*xdr);
+                    xdr++;
+                    //cout << length << " ";
+                    // Old versions truncated the string but left the length unadjusted.
+                    if (length > MAX_TEXT_SIZE)
+                        length = MAX_TEXT_SIZE;
+                    //pData->string_value = new char[length + 1];
+                    cp = _s_text;
+                    //cout << " String: ";
+                    for (unsigned i = 0; i < length; i++)
+                    {
+                        //pData->string_value[i] = (char)XDR_decode_int8(*xdr);
+                        cp[i] = (char)XDR_decode_int8(*xdr);
+                        xdr++;
+                    }
+
+                    cp[length] = '\0';
+                    txtlen = length;
+                    // Now handle the padding
+                    while ((length % 4) != 0)
+                    {
+                        xdr++;
+                        length++;
+                        //cout << "0";
+                    }
+                    dt = "STRING";
+                    //cout << "\n";
+                }
+                if (VERB5) {
+                    SPRTF("%u %s %s len %d\n", id, plist->name, dt, txtlen);
+                }
+                break;
+            default:
+                cp = GetNxtBuf();
+                sprintf(cp, "%s: Unknown Prop type %d\n", module, (int)id);
+                if (add_2_list(cp))
+                    SPRTF("%s", cp);
+                xdr++;
+                break;
+            }
+        }
+        else {
+            cp = GetNxtBuf();
+            sprintf(cp, "%s: %u: Not in the Prop list...\n", module, id);
+            if (add_2_list(cp))
+                SPRTF("%s", cp);
+        }
+    }
+}
+
+#else // !USE_PROTO_2
+
+void Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * propsEnd)
+{
+    static char _s_text[MAX_TEXT_SIZE];
+    xdr_data_t * txd;
+    char *cp;
+    while (xdr < msgEnd) {
+        // First element is always the ID
+        // int id = XDR_decode<int>(*xdr);
+#ifdef USE_SIMGEAR
+        unsigned id = XDR_decode_uint32(*xdr);
+        /*
+        * As we can detect a short int encoded value (by the upper word being non-zero) we can
+        * do the decode here; set the id correctly, extract the integer and set the flag.
+        * This can then be picked up by the normal processing based on the flag
+        */
+        int int_value = 0;
+        bool short_int_encoded = false;
+        if (id & 0xffff0000)
+        {
+            int v1, v2;
+            XDR_decode_shortints32(*xdr, v1, v2);
+            int_value = v2;
+            id = v1;
+            short_int_encoded = true;
+        }
+#else 
+        unsigned id = XDR_decode<int>(*xdr);
+#endif
+        //cout << pData->id << " ";
+        xdr++;
+        const IdPropertyList* plist = findProperty(id);
+        if (plist) {
+            int ival = 0, bval = 0, c = 0;
+            float val = 0.0;
+            uint32_t length = 0;
+            uint32_t txtlen = 0;
+            uint32_t offset = 0;
+            // How we decode the remainder of the property depends on the type
+            switch (plist->type) {
+            case sgp_INT:
+                //case props::LONG:
+#ifdef USE_SIMGEAR
+                ival = XDR_decode_int32(*xdr);
+#else
+                ival = XDR_decode<int>(*xdr);
+#endif
+                if (VERB5) {
+                    SPRTF("%u %s %s %d\n", id, plist->name, type2stg(plist->type), ival);
+                }
+                xdr++;
+                break;
+            case sgp_BOOL:
+#ifdef USE_SIMGEAR
+                bval = XDR_decode_int32(*xdr);
+#else
+                bval = XDR_decode<int>(*xdr);
+#endif
+                if (VERB5) {
+                    SPRTF("%u %s %s %s\n", id, plist->name, type2stg(plist->type),
+                        (bval ? "True" : "False"));
+                }
+                xdr++;
+                break;
+            case sgp_FLOAT:
+                //case props::DOUBLE:
+            {
+#ifdef USE_SIMGEAR
+                val = XDR_decode_float(*xdr);
+#else
+                val = XDR_decode<float>(*xdr);
+#endif
+                //if (SGMisc<float>::isNaN(val))
+                //    return false;
+                if (VERB5) {
+                    SPRTF("%u %s %s %f\n", id, plist->name, type2stg(plist->type), val);
+                }
+                xdr++;
+                break;
+            }
+            case sgp_STRING:
+                //case props::UNSPECIFIED:
+            {
+                // String is complicated. It consists of
+                // The length of the string
+                // The string itself
+                // Padding to the nearest 4-bytes.
+                // XXX Yes, each byte is padded out to a word! Too late
+                // to change...
+#ifdef USE_SIMGEAR
+                length = XDR_decode_int32(*xdr);
+#else
+                length = XDR_decode<int>(*xdr);
+#endif
+                xdr++;
+                txd = xdr;
+                // Old versions truncated the string but left the length
+                // unadjusted.
+                if (length > MAX_TEXT_SIZE)
+                    length = MAX_TEXT_SIZE;
+                xdr += length;
+                txtlen = length;
+                // Now handle the padding
+                while ((length % 4) != 0)
+                {
+                    xdr++;
+                    length++;
+                    //cout << "0";
+                }
+                if (VERB5) {
+                    SPRTF("%u %s %s len %d\n", id, plist->name, type2stg(plist->type), txtlen);
+                }
+                cp = _s_text;
+                offset = 0;
+                while (txtlen--) {
+#ifdef USE_SIMGEAR
+                    int c = XDR_decode_int32(*txd);
+#else
+                    int c = XDR_decode<int>(*txd);
+#endif
+                    cp[offset++] = (char)c;
+                    txd++;
+                }
+                cp[offset] = 0;
+                if (offset && VERB9)
+                    SPRTF("Text: '%s'\n", cp);
+            }
+            break;
+            default:
+                cp = GetNxtBuf();
+                sprintf(cp, "%s: Unknown Prop type %d\n", module, (int)id);
+                if (add_2_list(cp))
+                    SPRTF("%s", cp);
+                xdr++;
+                break;
+            }
+        }
+        else {
+            cp = GetNxtBuf();
+            sprintf(cp, "%s: %u: Not in the Prop list...\n", module, id);
+            if (add_2_list(cp))
+                SPRTF("%s", cp);
+        }
+
+
+    }
+
+
+}
+#endif // USE_PROTO_2 y/n
+
 Packet_Type Deal_With_Packet(char *packet, int len)
 {
     static CF_Pilot _s_new_pilot;
     static char _s_tdchk[256];
-    static char _s_text[MAX_TEXT_SIZE];
-
     uint32_t        MsgId;
     uint32_t        MsgMagic;
     uint32_t        MsgLen;
@@ -674,15 +1528,21 @@ Packet_Type Deal_With_Packet(char *packet, int len)
     char           *pcs;
     int             i;
     char           *pm;
-    char           *cp;
 
     pp = &_s_new_pilot;
     memset(pp, 0, sizeof(CF_Pilot)); // ensure new is ALL zero
     MsgHdr = (PT_MsgHdr)packet;
+#ifdef USE_SIMGEAR
+    MsgMagic = XDR_decode_uint32(MsgHdr->Magic);
+    MsgId    = XDR_decode_uint32(MsgHdr->MsgId);
+    MsgLen   = XDR_decode_uint32(MsgHdr->MsgLen);
+    MsgProto = XDR_decode_uint32(MsgHdr->Version);
+#else // !USE_SIMGEAR
     MsgMagic = XDR_decode<uint32_t>(MsgHdr->Magic);
     MsgId = XDR_decode<uint32_t>(MsgHdr->MsgId);
     MsgLen = XDR_decode<uint32_t>(MsgHdr->MsgLen);
     MsgProto = XDR_decode<uint32_t>(MsgHdr->Version);
+#endif // USE_SIMGEAR y/n
 
     pcs = pp->callsign;
     for (i = 0; i < MAX_CALLSIGN_LEN; i++) {
@@ -719,12 +1579,27 @@ Packet_Type Deal_With_Packet(char *packet, int len)
         // jump up the the position message
         PosMsg = (T_PositionMsg *)(packet + sizeof(T_MsgHdr));
         pp->prev_time = pp->curr_time;
+#ifdef USE_SIMGEAR
+        pp->sim_time = XDR_decode_double(PosMsg->time); // get SIM time
+#else
         pp->sim_time = XDR_decode64<double>(PosMsg->time); // get SIM time
+#endif
         pm = get_Model(PosMsg->Model);
         strcpy(pp->aircraft, pm);
 
         // SPRTF("%s: POS Packet %d of len %d, buf %d, cs %s, mod %s, time %lf\n", module, packet_cnt, MsgLen, len, pcs, pm, pp->sim_time);
         // get Sender address and port - need patch in fgms to pass this
+
+#ifdef USE_SIMGEAR
+        pp->SenderAddress = XDR_decode_uint32(MsgHdr->ReplyAddress);
+        pp->SenderPort = XDR_decode_uint32(MsgHdr->ReplyPort);
+        px = XDR_decode_double(PosMsg->position[X]);
+        py = XDR_decode_double(PosMsg->position[Y]);
+        pz = XDR_decode_double(PosMsg->position[Z]);
+        pp->ox = XDR_decode_float(PosMsg->orientation[X]);
+        pp->oy = XDR_decode_float(PosMsg->orientation[Y]);
+        pp->oz = XDR_decode_float(PosMsg->orientation[Z]);
+#else
         pp->SenderAddress = XDR_decode<uint32_t>(MsgHdr->ReplyAddress);
         pp->SenderPort = XDR_decode<uint32_t>(MsgHdr->ReplyPort);
         px = XDR_decode64<double>(PosMsg->position[X]);
@@ -733,6 +1608,7 @@ Packet_Type Deal_With_Packet(char *packet, int len)
         pp->ox = XDR_decode<float>(PosMsg->orientation[X]);
         pp->oy = XDR_decode<float>(PosMsg->orientation[Y]);
         pp->oz = XDR_decode<float>(PosMsg->orientation[Z]);
+#endif
         if ((px == 0.0) || (py == 0.0) || (pz == 0.0)) {
             failed_cnt++;
             return pkt_InvPos;
@@ -799,7 +1675,7 @@ Packet_Type Deal_With_Packet(char *packet, int len)
 #ifdef USE_SIMGEAR  // TOCHECK SG function to get speed
         SGVec3f linearVel;
         for (unsigned i = 0; i < 3; ++i)
-            linearVel(i) = XDR_decode<float>(PosMsg->linearVel[i]);
+            linearVel(i) = XDR_decode_float(PosMsg->linearVel[i]);
         pp->speed = norm(linearVel) * SG_METER_TO_NM * 3600.0;
 #else // !#ifdef USE_SIMGEAR
         pp->SenderOrientation.Set(pp->ox, pp->oy, pp->oz);
@@ -911,111 +1787,10 @@ Packet_Type Deal_With_Packet(char *packet, int len)
 
         ///////////////////////////////////////////////////////////////////////////////////////
         // DEAL WITH PROPERTIES
-        xdr_data_t * txd;
         xdr_data_t * xdr =(xdr_data_t *)(packet + sizeof(T_MsgHdr) + sizeof(T_PositionMsg));
         xdr_data_t * msgEnd = (xdr_data_t *)(packet + len);
         xdr_data_t * propsEnd = (xdr_data_t *)(packet + MAX_PACKET_SIZE);
-        while (xdr < msgEnd) {
-            // First element is always the ID
-            //unsigned id = XDR_decode_uint32(*xdr);
-            int id = XDR_decode<int>(*xdr);
-            //cout << pData->id << " ";
-            xdr++;
-            const IdPropertyList* plist = findProperty(id);
-            if (plist) {
-                int ival = 0, bval = 0, c = 0;
-                float val = 0.0;
-                uint32_t length = 0;
-                uint32_t txtlen = 0;
-                uint32_t offset = 0;
-                // How we decode the remainder of the property depends on the type
-                switch (plist->type) {
-                case sgp_INT:
-                //case props::LONG:
-                    ival = XDR_decode<int>(*xdr);
-                    if (VERB5) {
-                        SPRTF("%u %s %s %d\n", id, plist->name, type2stg(plist->type), ival);
-                    }
-                    xdr++;
-                    break;
-                case sgp_BOOL:
-                    bval = XDR_decode<int>(*xdr);
-                    if (VERB5) {
-                        SPRTF("%u %s %s %s\n", id, plist->name, type2stg(plist->type),
-                            (bval ? "True" : "False"));
-                    }
-                    xdr++;
-                    break;
-                case sgp_FLOAT:
-                //case props::DOUBLE:
-                {
-                    val = XDR_decode<float>(*xdr);
-                    //if (SGMisc<float>::isNaN(val))
-                    //    return false;
-                    if (VERB5) {
-                        SPRTF("%u %s %s %f\n", id, plist->name, type2stg(plist->type), val);
-                    }
-                    xdr++;
-                    break;
-                }
-                case sgp_STRING:
-                //case props::UNSPECIFIED:
-                {
-                    // String is complicated. It consists of
-                    // The length of the string
-                    // The string itself
-                    // Padding to the nearest 4-bytes.
-                    // XXX Yes, each byte is padded out to a word! Too late
-                    // to change...
-                    length = XDR_decode<int>(*xdr);
-                    xdr++;
-                    txd = xdr;
-                    // Old versions truncated the string but left the length
-                    // unadjusted.
-                    if (length > MAX_TEXT_SIZE)
-                        length = MAX_TEXT_SIZE;
-                    xdr += length;
-                    txtlen = length;
-                    // Now handle the padding
-                    while ((length % 4) != 0)
-                    {
-                        xdr++;
-                        length++;
-                        //cout << "0";
-                    }
-                    if (VERB5) {
-                        SPRTF("%u %s %s len %d\n", id, plist->name, type2stg(plist->type), txtlen);
-                    }
-                    cp = _s_text;
-                    offset = 0;
-                    while (txtlen--) {
-                        int c = XDR_decode<int>(*txd);
-                        cp[offset++] = (char)c;
-                        txd++;
-                    }
-                    cp[offset] = 0;
-                    if (offset && VERB9)
-                        SPRTF("Text: '%s'\n", cp);
-                }
-                break;
-                default:
-                    cp = GetNxtBuf();
-                    sprintf(cp,"%s: Unknown Prop type %d\n", module, (int)id);
-                    if (add_2_list(cp))
-                        SPRTF("%s", cp);
-                    xdr++;
-                    break;
-                }
-            }
-            else {
-                cp = GetNxtBuf();
-                sprintf(cp,"%s: %u: Not in the Prop list...\n", module, id);
-                if (add_2_list(cp))
-                    SPRTF("%s", cp);
-            }
-
-
-        }
+        Deal_With_Properties(xdr, msgEnd, propsEnd);
         return pkt_Pos;
 
     } else if (MsgId == CHAT_MSG_ID) {
@@ -1109,7 +1884,10 @@ static int get_next_block()
             else {
  // Bad_Read:
                 if (feof(raw_log_fp)) {
-                    SPRTF("%s: Reached EOF!\n", module);
+                    if (VERB9)
+                    {
+                        SPRTF("%s: Reached EOF!\n", module);
+                    }
                 }
                 else {
                     SPRTF("%s: Failed to get the next raw block!\n", module);
@@ -1222,10 +2000,23 @@ static int process_log() // actions of app
     while (get_next_block()) {
         blk_cnt++;
     }
-
-    SPRTF("%s: Processed %d mp packets...\n", module, 
-        (int) (blk_cnt ? blk_cnt + 1 : blk_cnt));
-
+    if (VERB1)
+    {
+        size_t ii, len = vIdsUsed.size();
+        SPRTF("%s: Processed %d mp packets... using %d of %d prop ids...\n", module,
+            (int)(blk_cnt ? blk_cnt + 1 : blk_cnt),
+            (int)len,
+            (int)numProperties
+        );
+        if (VERB9 && len) {
+            // using default comparison (operator <):
+            std::sort(vIdsUsed.begin(), vIdsUsed.end());           //(12 32 45 71)26 80 53 33
+            SPRTF("Props %d ids: ", (int)len);
+            for (ii = 0; ii < len; ii++)
+                SPRTF("%d ", vIdsUsed[ii]);
+            SPRTF("\n");
+        }
+    }
     return 0;
 }
 
