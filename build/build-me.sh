@@ -4,6 +4,7 @@ BN=`basename $0`
 TMPPRJ="cf-log"
 TMPLOG="bldlog-1.txt"
 TMPSG="/home/geoff/fg/next/install/simgear"
+TMPSG2="/media/pi/SAMSUNG2/projects/FG/next/install/simgear"
 
 TMPOPTS=""
 # Possible options to help with problems
@@ -19,6 +20,11 @@ fi
 if [ -d "$TMPSG" ]; then
     TMPOPTS="$TMPOPTS -DUSE_SIMGEAR_LIB:BOOL=TRUE"
     TMPOPTS="$TMPOPTS -DCMAKE_PREFIX_PATH=$TMPSG"
+else
+	if [ -d "$TMPSG2" ]; then
+	    TMPOPTS="$TMPOPTS -DUSE_SIMGEAR_LIB:BOOL=TRUE"
+    	    TMPOPTS="$TMPOPTS -DCMAKE_PREFIX_PATH=$TMPSG2"
+	fi
 fi
 if [ -f "$TMPLOG" ]; then
     rm -f $TMPLOG
