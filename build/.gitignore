@@ -18,4 +18,6 @@ Win32/*
 *.sln
 *.suo
 ipch/*
+libxdr_lib.a
+raw-log
 
