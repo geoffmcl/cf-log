@@ -86,7 +86,9 @@ static size_t raw_log_size = 0;
 static size_t raw_log_remaining = 0;
 static size_t packet_cnt = 0;
 static int show_consumed_bytes = 0;
+#if !defined(NDEBUG) && defined(_MSC_VER)
 static const char *sample = "F:\\Projects\\cf-log\\data\\sampleudp01.log";
+#endif
 
 static vSTG vWarnings;
 int add_2_list(char *msg)
