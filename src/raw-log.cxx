@@ -17,6 +17,7 @@
 #include <algorithm> // for std::equal_range, ...
 #include <vector>
 #include <string>
+#include <map>
 #include <time.h>
 #ifndef _MSC_VER
 #include <string.h> // for strcpy(), ...
@@ -52,6 +53,8 @@
 
 typedef std::vector<std::string> vSTG;
 typedef std::vector<uint32_t>   vUINT;
+typedef std::map<int, int> mINTINT;
+typedef mINTINT::iterator iINTINT;
 
 static const char *module = "raw-log";
 #define M2F 3.28084
@@ -101,8 +104,10 @@ int add_2_list(char *msg)
 }
 
 static vUINT vIdsUsed;
+void add_id_count(unsigned int id);
 int add_2_ids(uint32_t id)
 {
+    add_id_count(id);
     size_t ii, len = vIdsUsed.size();
     uint32_t ui;
     for (ii = 0; ii < len; ii++) {
@@ -208,7 +213,7 @@ void give_help( char *name )
     SPRTF("Options:\n");
     SPRTF(" --help  (-h or -?) = This help and exit(0)\n");
     SPRTF(" --verb[n]     (-v) = Bump or set verbosity to n. Values 0,1,2,5,9 (def=%d)\n", verbosity);
-    // TODO: More help
+    SPRTF(" --log <file>  (-l) = Set name of output log. (def=%s)\n", def_log);
     SPRTF("\n");
     SPRTF("Description:\n");
     SPRTF(" Read and decode a raw log of FGFS mp packets, and output information found.\n");
@@ -257,6 +262,10 @@ int parse_args( int argc, char **argv )
                         verbosity++;
                     sarg++;
                 }
+                break;
+            case 'l':
+                if (i2 < argc)
+                    i++;    // already handled
                 break;
             // TODO: Other arguments
             default:
@@ -534,7 +543,24 @@ struct PropertyTraits<TYPE> \
 
 static const char *type2stg(simgear::props::Type t)
 {
-    return "?";
+    switch (t)
+    {
+    case simgear::props::INT:
+        return "INT";
+    case simgear::props::BOOL:
+        return "BOOL";
+    case simgear::props::LONG:
+        return "LONG";
+    case simgear::props::FLOAT:
+        return "FLOAT";
+    case simgear::props::DOUBLE:
+        return "DOUBLE";
+    case simgear::props::STRING:
+        return "STRING";
+    case simgear::props::UNSPECIFIED:
+        return "UNSPCIFIED";
+    }
+    return "UNKNOWN";
 }
 
 struct FGPropertyData {
@@ -923,6 +949,28 @@ static const IdPropertyList sIdPropertyList[] = {
 const int MAX_PARTITIONS = 2;
 const unsigned int numProperties = (sizeof(sIdPropertyList) / sizeof(sIdPropertyList[0]));
 
+static mINTINT mIdCounts;
+static int done_init = 0;
+void init_full_map()
+{
+    if (done_init)
+        return;
+    unsigned int id, i;
+    for (i = 0; i < numProperties; i++)
+    {
+        id = sIdPropertyList[i].id;
+        mIdCounts[id] = 0;
+    }
+    done_init = 1;
+}
+
+void add_id_count(unsigned int id)
+{
+    if (!done_init)
+        init_full_map();
+    mIdCounts[id]++;
+}
+
 // Look up a property ID using binary search.
 namespace
 {
@@ -1179,10 +1227,11 @@ static double elapsed_sim_time = 0.0;
 static bool got_sim_time = false;
 
 #ifdef USE_PROTO_2
-void Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * propsEnd)
+int Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * propsEnd)
 {
     static char _s_text[MAX_TEXT_SIZE];
     char *cp;
+    int prop_cnt = 0;
     while (xdr < msgEnd) {
         // First element is always the ID
         // int id = XDR_decode<int>(*xdr);
@@ -1235,9 +1284,10 @@ void Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * pr
                     dt = "INT";
                 }
                 if (VERB5) {
-                    SPRTF("%u %s %s %d\n", id, plist->name, dt, ival);
+                    SPRTF("[v5]: %u %s %s %d\n", id, plist->name, dt, ival);
                 }
                 //cout << pData->int_value << "\n";
+                prop_cnt++;
                 break;
             case simgear::props::FLOAT:
             case simgear::props::DOUBLE:
@@ -1277,8 +1327,9 @@ void Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * pr
                     dt = "FLOAT";
                 }
                 if (VERB5) {
-                    SPRTF("%u %s %s %lf\n", id, plist->name, dt, val);
+                    SPRTF("[v5]: %u %s %s %lf\n", id, plist->name, dt, val);
                 }
+                prop_cnt++;
                 break;
             case simgear::props::STRING:
             case simgear::props::UNSPECIFIED:
@@ -1333,8 +1384,9 @@ void Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * pr
                     //cout << "\n";
                 }
                 if (VERB5) {
-                    SPRTF("%u %s %s len %d\n", id, plist->name, dt, txtlen);
+                    SPRTF("[v5]: %u %s %s len %d\n", id, plist->name, dt, txtlen);
                 }
+                prop_cnt++;
                 break;
             default:
                 cp = GetNxtBuf();
@@ -1350,17 +1402,20 @@ void Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * pr
             sprintf(cp, "%s: %u: Not in the Prop list...\n", module, id);
             if (add_2_list(cp))
                 SPRTF("%s", cp);
+            xdr++;
         }
     }
+    return prop_cnt;
 }
 
 #else // !USE_PROTO_2
 
-void Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * propsEnd)
+int Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * propsEnd)
 {
     static char _s_text[MAX_TEXT_SIZE];
     xdr_data_t * txd;
     char *cp;
+    int prop_cnt = 0;
     while (xdr < msgEnd) {
         // First element is always the ID
         // int id = XDR_decode<int>(*xdr);
@@ -1406,6 +1461,7 @@ void Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * pr
                     SPRTF("%u %s %s %d\n", id, plist->name, type2stg(plist->type), ival);
                 }
                 xdr++;
+                prop_cnt++;
                 break;
             case sgp_BOOL:
 #ifdef USE_SIMGEAR
@@ -1418,6 +1474,7 @@ void Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * pr
                         (bval ? "True" : "False"));
                 }
                 xdr++;
+                prop_cnt++;
                 break;
             case sgp_FLOAT:
                 //case props::DOUBLE:
@@ -1433,6 +1490,7 @@ void Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * pr
                     SPRTF("%u %s %s %f\n", id, plist->name, type2stg(plist->type), val);
                 }
                 xdr++;
+                prop_cnt++;
                 break;
             }
             case sgp_STRING:
@@ -1482,6 +1540,7 @@ void Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * pr
                 if (offset && VERB9)
                     SPRTF("Text: '%s'\n", cp);
             }
+            prop_cnt++;
             break;
             default:
                 cp = GetNxtBuf();
@@ -1498,11 +1557,8 @@ void Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * pr
             if (add_2_list(cp))
                 SPRTF("%s", cp);
         }
-
-
     }
-
-
+    return prop_cnt;
 }
 #endif // USE_PROTO_2 y/n
 
@@ -1718,7 +1774,7 @@ Packet_Type Deal_With_Packet(char *packet, int len)
                 if (sseconds > elapsed_sim_time) {
                     double add = sseconds - elapsed_sim_time;
                     if (VERB9) {
-                        SPRTF("%s: Update elapsed from %lf by %lf to %lf, from cs %s, model %s\n", module,
+                        SPRTF("[v9]: %s: Update elapsed from %lf by %lf to %lf, from cs %s, model %s\n", module,
                             elapsed_sim_time, add, sseconds,
                             pp->callsign, pp->aircraft);
                     }
@@ -1790,7 +1846,10 @@ Packet_Type Deal_With_Packet(char *packet, int len)
         xdr_data_t * xdr =(xdr_data_t *)(packet + sizeof(T_MsgHdr) + sizeof(T_PositionMsg));
         xdr_data_t * msgEnd = (xdr_data_t *)(packet + len);
         xdr_data_t * propsEnd = (xdr_data_t *)(packet + MAX_PACKET_SIZE);
-        Deal_With_Properties(xdr, msgEnd, propsEnd);
+        int prop_cnt = Deal_With_Properties(xdr, msgEnd, propsEnd);
+        if (VERB5) {
+            SPRTF("[v5]: Done position packet: len %d bytes, %d props...\n", len, prop_cnt);
+        }
         return pkt_Pos;
 
     } else if (MsgId == CHAT_MSG_ID) {
@@ -1886,7 +1945,7 @@ static int get_next_block()
                 if (feof(raw_log_fp)) {
                     if (VERB9)
                     {
-                        SPRTF("%s: Reached EOF!\n", module);
+                        SPRTF("[v9]: %s: Reached EOF!\n", module);
                     }
                 }
                 else {
@@ -2008,24 +2067,117 @@ static int process_log() // actions of app
             (int)len,
             (int)numProperties
         );
-        if (VERB9 && len) {
-            // using default comparison (operator <):
-            std::sort(vIdsUsed.begin(), vIdsUsed.end());           //(12 32 45 71)26 80 53 33
-            SPRTF("Props %d ids: ", (int)len);
-            for (ii = 0; ii < len; ii++)
-                SPRTF("%d ", vIdsUsed[ii]);
-            SPRTF("\n");
+        if (len) {
+            uint32_t id, cnt, havecnt = 0, total = 0;
+            iINTINT p;
+            const char *pt;
+            const IdPropertyList *list;
+            if (VERB5) {
+                for (p = mIdCounts.begin(); p != mIdCounts.end(); p++)
+                {
+                    cnt = p->second;
+                    if (cnt)
+                        havecnt++;
+                    total++;
+                }
+                SPRTF("[v5]: Show of %d of %d properties that have a count...\n", (int)havecnt, (int)total);
+                     //    10    20 sim/multiplay/protocol-version
+                SPRTF("Id     Count Property\n");
+                for (p = mIdCounts.begin(); p != mIdCounts.end(); p++)
+                {
+                    id = p->first;
+                    cnt = p->second;
+                    if (cnt) {
+                        list = findProperty(id);
+                        if (list) {
+                            pt = type2stg(list->type);
+                            SPRTF("%5u %5u %s %s\n", id, cnt, list->name, pt);
+                        }
+                        else
+                            SPRTF("%5u %5u\n", id, cnt);
+                    }
+                }
+                if (VERB9) {
+                    // show all entries that have NO count
+                    SPRTF("[v9]: Show of %d of %d properties that have NO count...\n", (int)(total - havecnt), (int)total);
+                    SPRTF("Id     Count Property\n");
+                    for (p = mIdCounts.begin(); p != mIdCounts.end(); p++)
+                    {
+                        id = p->first;
+                        cnt = p->second;
+                        if (!cnt) {
+                            list = findProperty(id);
+                            if (list) {
+                                pt = type2stg(list->type);
+                                SPRTF("%5u %5u %s %s\n", id, cnt, list->name, pt);
+                            }
+                            else
+                                SPRTF("%5u %5u\n", id, cnt);
+                        }
+
+                    }
+                }
+            }
+            else if (VERB2) {
+                // using default comparison (operator <):
+                std::sort(vIdsUsed.begin(), vIdsUsed.end());           //(12 32 45 71)26 80 53 33
+                // just show simple oneline list - no counts
+                SPRTF("[v2]: Props %d ids: ", (int)len);
+                for (ii = 0; ii < len; ii++)
+                    SPRTF("%d ", vIdsUsed[ii]);
+                SPRTF("\n");
+            }
         }
     }
     return 0;
 }
 
+int chk_log_file(int argc, char **argv)
+{
+    int i, i2, c;
+    char *arg, *sarg;
+    for (i = 1; i < argc; i++) {
+        arg = argv[i];
+        i2 = i + 1;
+        if (*arg == '-') {
+            sarg = &arg[1];
+            while (*sarg == '-')
+                sarg++;
+            c = *sarg;
+            switch (c) {
+            case 'l':
+                if (i2 < argc) {
+                    i++;
+                    sarg = argv[i];
+                    def_log = strdup(sarg);
+                    break;
+                }
+                else {
+                    fprintf(stderr, "Expected log file to follow '%s'!\n", arg);
+                    return 1;
+                }
+            }
+        }
+    }
+    set_log_file((char *)def_log, false);
+    return 0;
+}
+
+void clean_up()
+{
+    vWarnings.clear();
+    vIdsUsed.clear();
+    vPilots.clear();
+    mIdCounts.clear();
+}
 
 // main() OS entry
 int main( int argc, char **argv )
 {
     int iret = 0;
-    set_log_file((char *)def_log, false);
+    iret = chk_log_file(argc, argv);
+    if (iret)
+        return iret;
     iret = parse_args(argc,argv);
     if (iret) {
         if (iret == 2)
@@ -2036,7 +2188,7 @@ int main( int argc, char **argv )
     iret = process_log(); // TODO: actions of app
     show_packet_stats();
     show_warnings();
-
+    clean_up();
     return iret;
 }
 
