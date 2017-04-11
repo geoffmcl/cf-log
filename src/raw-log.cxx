@@ -1280,7 +1280,7 @@ int Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * pro
             double val = 0.0;
             // uint32_t length = 0;
             uint32_t txtlen = 0;
-            uint32_t offset = 0;
+            // uint32_t offset = 0;
             add_2_ids(id);
             // How we decode the remainder of the property depends on the type
             switch (plist->type) {
@@ -1596,7 +1596,7 @@ int Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * pro
 Packet_Type Deal_With_Packet(char *packet, int len)
 {
     static CF_Pilot _s_new_pilot;
-    static char _s_tdchk[256];
+    // static char _s_tdchk[256];
     uint32_t        MsgId;
     uint32_t        MsgMagic;
     uint32_t        MsgLen;
@@ -1607,7 +1607,7 @@ Packet_Type Deal_With_Packet(char *packet, int len)
     size_t          max, ii;
     //char           *upd_by;
     double          sseconds;
-    char           *tb = _s_tdchk;
+    // char           *tb = _s_tdchk;
     //bool            revived;
     time_t          curr_time = time(0);
     double          lat, lon, alt;
