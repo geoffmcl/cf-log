@@ -85,7 +85,7 @@ static double raw_bgn_secs = 0.0;   // start of raw log reading
 static size_t raw_log_size = 0;
 static size_t raw_log_remaining = 0;
 static size_t packet_cnt = 0;
-
+static int show_consumed_bytes = 0;
 static const char *sample = "F:\\Projects\\cf-log\\data\\sampleudp01.log";
 
 static vSTG vWarnings;
@@ -1278,7 +1278,7 @@ int Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * pro
             const char *dt = "UNK";
             int ival = 0;
             double val = 0.0;
-            uint32_t length = 0;
+            // uint32_t length = 0;
             uint32_t txtlen = 0;
             uint32_t offset = 0;
             add_2_ids(id);
@@ -1430,6 +1430,10 @@ int Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * pro
             if (add_2_list(cp))
                 SPRTF("%s", cp);
             xdr++;
+        }
+        if (VERB9 && show_consumed_bytes) {
+            size_t consumed = ((char *)xdr - (char *)bgn_xdr);
+            SPRTF("[v9]: %d bytes consumed by this property\n", (int)consumed);
         }
     }
     return prop_cnt;
