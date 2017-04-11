@@ -652,6 +652,7 @@ struct IdPropertyList {
 
 static const IdPropertyList* findProperty(unsigned id);
 
+#if 0 // 0000000000000000000000000000000000000000
 /*
 * not yet used method to avoid transmitting a string for something that should always have been
 * an integer
@@ -660,6 +661,7 @@ static int convert_launchbar_state(int direction, xdr_data_t*, FGPropertyData*)
 {
     return 0; // no conversion performed
 }
+#endif // 000000000000000000000000000000000000000
 
 // A static map of protocol property id values to property paths,
 // This should be extendable dynamically for every specific aircraft ...
