@@ -459,6 +459,7 @@ enum sgp_Type {
     sgp_INT
 };
 
+#ifndef USE_SIMGEAR
 typedef struct tagT2STG {
     sgp_Type t;
     const char *stg;
@@ -473,7 +474,6 @@ static T2STG t2stg[]{
     { sgp_UNKNOW, 0 }
 };
 
-#ifndef USE_SIMGEAR
 static const char *type2stg(sgp_Type t)
 {
     PT2STG pts = t2stg;
