@@ -1276,7 +1276,7 @@ int Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * pro
         if (plist)
         {
             const char *dt = "UNK";
-            int ival = 0, bval = 0, c = 0;
+            int ival = 0;
             double val = 0.0;
             uint32_t length = 0;
             uint32_t txtlen = 0;
