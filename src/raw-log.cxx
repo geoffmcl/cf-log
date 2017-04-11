@@ -1010,20 +1010,20 @@ const IdPropertyList* findProperty(unsigned id)
 
 
 
-#else // !USE PROTO_2
+// #else // !USE PROTO_2
 
-struct IdPropertyList {
+struct IdPropertyList1 {
     unsigned id;
     const char* name;
     sgp_Type type;
 };
 
-static const IdPropertyList* findProperty(unsigned id);
+static const IdPropertyList1* findProperty1(unsigned id);
 
 // A static map of protocol property id values to property paths,
 // This should be extendable dynamically for every specific aircraft ...
 // For now only that static list
-static const IdPropertyList sIdPropertyList[] = {
+static const IdPropertyList1 sIdPropertyList1[] = {
     { 100, "surface-positions/left-aileron-pos-norm",  sgp_FLOAT },
     { 101, "surface-positions/right-aileron-pos-norm", sgp_FLOAT },
     { 102, "surface-positions/elevator-pos-norm",      sgp_FLOAT },
@@ -1199,14 +1199,14 @@ static const IdPropertyList sIdPropertyList[] = {
     { 10319, "sim/multiplay/generic/int[19]", sgp_INT }
 };
 
-const unsigned int numProperties = (sizeof(sIdPropertyList)
-    / sizeof(sIdPropertyList[0]));
+const unsigned int numProperties1 = (sizeof(sIdPropertyList1)
+    / sizeof(sIdPropertyList1[0]));
 
-static const IdPropertyList* findProperty(unsigned id) {
+static const IdPropertyList1* findProperty1(unsigned id) {
     unsigned int ui;
-    for (ui = 0; ui < numProperties; ui++) {
-        if (sIdPropertyList[ui].id == id)
-            return &sIdPropertyList[ui];
+    for (ui = 0; ui < numProperties1; ui++) {
+        if (sIdPropertyList1[ui].id == id)
+            return &sIdPropertyList1[ui];
     }
     return 0;
 }
@@ -1232,7 +1232,9 @@ int Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * pro
     static char _s_text[MAX_TEXT_SIZE];
     char *cp;
     int prop_cnt = 0;
+    xdr_data_t * bgn_xdr;
     while (xdr < msgEnd) {
+        bgn_xdr = xdr;  // Keep the start location
         // First element is always the ID
         // int id = XDR_decode<int>(*xdr);
 #ifdef USE_SIMGEAR
@@ -1258,7 +1260,9 @@ int Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * pro
         //cout << pData->id << " ";
         xdr++;
         const IdPropertyList* plist = findProperty(id);
-        if (plist) {
+        const IdPropertyList1* plist1 = findProperty1(id);  // get the previous 'list', if there is one...
+        if (plist)
+        {
             const char *dt = "UNK";
             int ival = 0, bval = 0, c = 0;
             double val = 0.0;
@@ -1393,8 +1397,19 @@ int Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * pro
                 sprintf(cp, "%s: Unknown Prop type %d\n", module, (int)id);
                 if (add_2_list(cp))
                     SPRTF("%s", cp);
-                xdr++;
+                xdr++;  // assume there was a following INT!
                 break;
+            }
+            if (plist1)
+            {
+                // This will probably be the SAME???
+            }
+            else
+            {
+                if (VERB9)
+                {
+                    SPRTF("[v9]: Such a property did %d NOT exist in Version 1!\n", id);
+                }
             }
         }
         else {
