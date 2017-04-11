@@ -541,26 +541,38 @@ struct PropertyTraits<TYPE> \
 
 };
 
+// try to avoid gcc warning about missing enums...
 static const char *type2stg(simgear::props::Type t)
 {
+    const char *pt = "UNKNOWN";
     switch (t)
     {
     case simgear::props::INT:
-        return "INT";
+        pt = "INT";
+        break;
     case simgear::props::BOOL:
-        return "BOOL";
+        pt = "BOOL";
+        break;
     case simgear::props::LONG:
-        return "LONG";
+        pt = "LONG";
+        break;
     case simgear::props::FLOAT:
-        return "FLOAT";
+        pt = "FLOAT";
+        break;
     case simgear::props::DOUBLE:
-        return "DOUBLE";
+        pt = "DOUBLE";
+        break;
     case simgear::props::STRING:
-        return "STRING";
+        pt = "STRING";
+        break;
     case simgear::props::UNSPECIFIED:
-        return "UNSPCIFIED";
+        pt = "UNSPCIFIED";
+        break;
+    default:
+        pt = "NOT IN SWITCH";
+        break;
     }
-    return "UNKNOWN";
+    return pt;
 }
 
 struct FGPropertyData {
