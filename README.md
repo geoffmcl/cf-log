@@ -47,9 +47,18 @@ to provide a simulate crossfeed http server, feeding up json (or xml) active fli
 The log will run for MANY hours, and when the end of the log is reached, all current 
 flights are expired, and the log restarted from the beiginning.
 
+raw-log
+-------
+
+This utility was started to analyse a **raw** log of catured FGFS MP packet output.
+
+It was recently updated to handle the new protocol version 2 output, which `packs` strings byte-by-byte, instead of the previous use of 4 bytes for each character, and can also `packs` many other property ids into to a single 4-bytes transmitted. This packing effectivel reduced the previous standard length mp packet from 1192 bytes, which would truncate some properties when a **chat** message were included, to about 880 bytes, allowing `chat` messages to be included without any truncation.
+
+After extensive testing have tagged this as `v1.0.0`.
+
 Enjoy.
 
-Geoff.
-20140920
+Geoff.  
+20170412 - 20140920
 
 ;eof
