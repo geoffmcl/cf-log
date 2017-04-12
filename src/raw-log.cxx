@@ -1403,7 +1403,9 @@ int Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * pro
                     dt = "STRING";
                     //cout << "\n";
                 }
-                if (VERB5) {
+                if (VERB9) {
+                    SPRTF("[v5]: %u %s %s len %d: '%s'\n", id, plist->name, dt, txtlen, cp);
+                } else if (VERB5) {
                     SPRTF("[v5]: %u %s %s len %d\n", id, plist->name, dt, txtlen);
                 }
                 prop_cnt++;
