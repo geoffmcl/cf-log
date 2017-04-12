@@ -21,8 +21,7 @@ option( USE_GEOGRAPHIC_LIB "Set ON to use Geographic library"         OFF )
 # use some local cmake modules
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/CMake;${CMAKE_MODULE_PATH}")
 
-add_definitions( -DVER=${cfl_MAJOR}${cfl_MINOR})
-add_definitions( -DVERDOT="${cfl_MAJOR}.${cfl_MINOR}")
+add_definitions( -DDOTVERSION="${cfl_MAJOR}.${cfl_MINOR}.${cfl_POINT}")
 
 if (NOT SG_VERSION)
 set( SG_VERSION "2.6") # FIXED: requiring 2.6+ should suffice here actually

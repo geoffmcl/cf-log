@@ -209,7 +209,7 @@ static void show_packet_stats()
 void give_help( char *name )
 {
     SPRTF("\n");
-    SPRTF("Usage:\n");
+    SPRTF("Usage: version " DOTVERSION "\n");
     SPRTF(" %s [options] usr_input\n", module);
     SPRTF("\n");
     SPRTF("Options:\n");
