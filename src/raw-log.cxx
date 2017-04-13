@@ -89,6 +89,7 @@ static int show_consumed_bytes = 0;
 #if !defined(NDEBUG) && defined(_MSC_VER)
 static const char *sample = "F:\\Projects\\cf-log\\data\\sampleudp01.log";
 #endif
+static int do_packet_test = 0;
 
 static vSTG vWarnings;
 int add_2_list(char *msg)
@@ -216,6 +217,7 @@ void give_help( char *name )
     SPRTF(" --help  (-h or -?) = This help and exit(0)\n");
     SPRTF(" --verb[n]     (-v) = Bump or set verbosity to n. Values 0,1,2,5,9 (def=%d)\n", verbosity);
     SPRTF(" --log <file>  (-l) = Set name of output log. (def=%s)\n", def_log);
+    SPRTF(" --test        (-t) = Do packet test, and exit(1) (def=%d)\n", do_packet_test);
     SPRTF("\n");
     SPRTF("Description:\n");
     SPRTF(" Read and decode a raw log of FGFS mp packets, and output information found.\n");
@@ -269,7 +271,10 @@ int parse_args( int argc, char **argv )
                 if (i2 < argc)
                     i++;    // already handled
                 break;
-            // TODO: Other arguments
+            case 't':
+                do_packet_test = 1;
+                break;
+                // TODO: Other arguments
             default:
                 SPRTF("%s: Unknown argument '%s'. Try -? for help...\n", module, arg);
                 return 1;
@@ -2216,6 +2221,8 @@ void clean_up()
     mIdCounts.clear();
 }
 
+void Create_Prop_Packet();
+
 // main() OS entry
 int main( int argc, char **argv )
 {
@@ -2230,6 +2237,10 @@ int main( int argc, char **argv )
         return iret;
     }
 
+    if (do_packet_test) {
+        Create_Prop_Packet();
+    }
+
     iret = process_log(); // TODO: actions of app
     show_packet_stats();
     show_warnings();
@@ -2237,5 +2248,358 @@ int main( int argc, char **argv )
     return iret;
 }
 
+/////////////////////////////////////////////////////////////////////////
+//// Create a full property packet
+// short FGMultiplayMgr::get_scaled_short(double v, double scale)
+short get_scaled_short(double v, double scale)
+{
+    float nv = v * scale;
+    if (nv >= 32767) return 32767;
+    if (nv <= -32767) return -32767;
+    short rv = (short)nv;
+    return rv;
+}
+
+void Create_Prop_Packet()
+{
+    int protocolVersion = 2;
+    unsigned int i, pid;
+    char Msg[MAX_PACKET_SIZE * 3];
+    xdr_data_t *ptr = reinterpret_cast<xdr_data_t*>(Msg + sizeof(T_MsgHdr) + sizeof(T_PositionMsg));
+    // xdr_data_t *msgEnd = reinterpret_cast<xdr_data_t*>(Msg + MAX_PACKET_SIZE);
+    xdr_data_t *msgEnd = reinterpret_cast<xdr_data_t*>(Msg + (MAX_PACKET_SIZE * 3));
+    int partition = 1;
+    int propsDone = 0;
+    int partcount[4];
+    vUINT vIdsAdded;
+
+    for (i = 0; i < 4; i++)
+        partcount[i] = 0;
+
+    for (partition = 1; partition <= protocolVersion; partition++)
+    {
+        for (i = 0; i < numProperties; i++)
+        {
+            // std::vector<FGPropertyData*>::const_iterator it = motionInfo.properties.begin();
+            // while (it != motionInfo.properties.end()) {
+            pid = sIdPropertyList[i].id;
+            const struct IdPropertyList* propDef = &sIdPropertyList[i]; // mPropertyDefinition[(*it)->id];
+            
+            //if (pid > 10319)
+            //    break;
+
+            if (propDef->version == partition || propDef->version > protocolVersion) // getProtocolToUse())
+            {
+                if (ptr + 2 >= msgEnd)
+                {
+                    // SG_LOG(SG_NETWORK, SG_ALERT, "Multiplayer packet truncated prop id: " << (*it)->id << ": " << propDef->name);
+                    SPRTF("Multiplayer packet truncated prop id: %d\nnode: %s\n", pid, propDef->name);
+                    break;
+                }
+
+                // First element is the ID. Write it out when we know we have room for
+                // the whole property.
+                xdr_data_t id = XDR_encode_uint32(pid); // (*it)->id);
+
+
+                /*
+                * 2017.2 protocol has the ability to transmit as a different type (to save space), so
+                * process this when using this protocol (protocolVersion 2) or later
+                */
+                int transmit_type = propDef->type;  // (*it)->type;
+
+                if (propDef->TransmitAs != TT_ASIS && protocolVersion > 1)
+                {
+                    transmit_type = propDef->TransmitAs;
+                }
+#if 0 // 00000000000000000000000000000000000000000
+                if (pMultiPlayDebugLevel->getIntValue() & 2)
+                    SG_LOG(SG_NETWORK, SG_INFO,
+                        "[SEND] pt " << partition <<
+                        ": buf[" << (ptr - data) * sizeof(*ptr)
+                        << "] id=" << (*it)->id << " type " << transmit_type);
+#endif // 0000000000000000000000000000000000000000
+
+                // The actual data representation depends on the type
+                switch (transmit_type) {
+                case TT_SHORTINT:
+                {
+                    //*ptr++ = XDR_encode_shortints32((*it)->id, (*it)->int_value);
+                    *ptr++ = XDR_encode_shortints32(pid, 0);
+                    propsDone++;
+                    partcount[partition]++;
+                    vIdsAdded.push_back(pid);
+                    break;
+                }
+                case TT_SHORT_FLOAT_1:
+                {
+                    //short value = get_scaled_short((*it)->float_value, 10.0);
+                    //*ptr++ = XDR_encode_shortints32((*it)->id, value);
+                    short value = get_scaled_short(0.0, 10.0);
+                    *ptr++ = XDR_encode_shortints32(pid, value);
+                    propsDone++;
+                    partcount[partition]++;
+                    vIdsAdded.push_back(pid);
+                    break;
+                }
+                case TT_SHORT_FLOAT_2:
+                {
+                    //short value = get_scaled_short((*it)->float_value, 100.0);
+                    //*ptr++ = XDR_encode_shortints32((*it)->id, value);
+                    short value = get_scaled_short(0.0, 100.0);
+                    *ptr++ = XDR_encode_shortints32(pid, value);
+                    propsDone++;
+                    partcount[partition]++;
+                    vIdsAdded.push_back(pid);
+                    break;
+                }
+                case TT_SHORT_FLOAT_3:
+                {
+                    //short value = get_scaled_short((*it)->float_value, 1000.0);
+                    //*ptr++ = XDR_encode_shortints32((*it)->id, value);
+                    short value = get_scaled_short(0.0, 1000.0);
+                    *ptr++ = XDR_encode_shortints32(pid, value);
+                    propsDone++;
+                    partcount[partition]++;
+                    vIdsAdded.push_back(pid);
+                    break;
+                }
+                case TT_SHORT_FLOAT_4:
+                {
+                    //short value = get_scaled_short((*it)->float_value, 10000.0);
+                    //*ptr++ = XDR_encode_shortints32((*it)->id, value);
+                    short value = get_scaled_short(0.0, 10000.0);
+                    *ptr++ = XDR_encode_shortints32(pid, value);
+                    propsDone++;
+                    partcount[partition]++;
+                    vIdsAdded.push_back(pid);
+                    break;
+                }
+
+                case TT_SHORT_FLOAT_NORM:
+                {
+                    //short value = get_scaled_short((*it)->float_value, 32767.0);
+                    //*ptr++ = XDR_encode_shortints32((*it)->id, value);
+                    short value = get_scaled_short(0.0, 32767.0);
+                    *ptr++ = XDR_encode_shortints32(pid, value);
+                    propsDone++;
+                    partcount[partition]++;
+                    vIdsAdded.push_back(pid);
+                    break;
+                }
+
+                case simgear::props::INT:
+                case simgear::props::BOOL:
+                case simgear::props::LONG:
+                    *ptr++ = id;
+                    //*ptr++ = XDR_encode_uint32((*it)->int_value);
+                    *ptr++ = XDR_encode_uint32(0);
+                    propsDone++;
+                    partcount[partition]++;
+                    vIdsAdded.push_back(pid);
+                    break;
+                case simgear::props::FLOAT:
+                case simgear::props::DOUBLE:
+                    *ptr++ = id;
+                    //*ptr++ = XDR_encode_float((*it)->float_value);
+                    *ptr++ = XDR_encode_float(0.0);
+                    propsDone++;
+                    partcount[partition]++;
+                    vIdsAdded.push_back(pid);
+                    break;
+                case simgear::props::STRING:
+                case simgear::props::UNSPECIFIED:
+                {
+                    if (protocolVersion > 1)
+                    {
+                        // New string encoding:
+                        // xdr[0] : ID length packed into 32 bit containing two shorts.
+                        // xdr[1..len/4] The string itself (char[length])
+                        //const char* lcharptr = (*it)->string_value;
+                        const char* lcharptr = "";
+
+                        if (lcharptr != 0)
+                        {
+                            uint32_t len = strlen(lcharptr);
+
+                            if (len >= MAX_TEXT_SIZE)
+                            {
+                                len = MAX_TEXT_SIZE - 1;
+                                //SG_LOG(SG_NETWORK, SG_ALERT, "Multiplayer property truncated at MAX_TEXT_SIZE in string " << (*it)->id);
+                                SPRTF("Multiplayer property truncated at MAX_TEXT_SIZE in string id %d\n", pid);
+                            }
+
+                            char *encodeStart = (char*)ptr;
+                            char *msgEndbyte = (char*)msgEnd;
+
+                            if (encodeStart + 2 + len >= msgEndbyte)
+                            {
+                                //SG_LOG(SG_NETWORK, SG_ALERT, "Multiplayer property not sent (no room) string " << (*it)->id);
+                                SPRTF("Multiplayer property not sent (no room) string %d\n", pid);
+                                goto escape;
+                            }
+
+                            //*ptr++ = XDR_encode_shortints32((*it)->id, len);
+                            *ptr++ = XDR_encode_shortints32(pid, len);
+                            encodeStart = (char*)ptr;
+                            if (len != 0)
+                            {
+                                int lcount = 0;
+                                while (*lcharptr && (lcount < MAX_TEXT_SIZE))
+                                {
+                                    if (encodeStart + 2 >= msgEndbyte)
+                                    {
+                                        //SG_LOG(SG_NETWORK, SG_ALERT, "Multiplayer packet truncated in string " << (*it)->id << " lcount " << lcount);
+                                        SPRTF("Multiplayer packet truncated in string %d, lcount %d\n", pid, lcount);
+                                        break;
+                                    }
+                                    *encodeStart++ = *lcharptr++;
+                                    lcount++;
+                                }
+                            }
+                            ptr = (xdr_data_t*)encodeStart;
+                            propsDone++;
+                            partcount[partition]++;
+                            vIdsAdded.push_back(pid);
+                        }
+                        else
+                        {
+                            // empty string, just send the id and a zero length
+                            *ptr++ = id;
+                            *ptr++ = XDR_encode_uint32(0);
+                            propsDone++;
+                            partcount[partition]++;
+                            vIdsAdded.push_back(pid);
+                        }
+                    }
+                    else {
+
+                        // String is complicated. It consists of
+                        // The length of the string
+                        // The string itself
+                        // Padding to the nearest 4-bytes.        
+                        // const char* lcharptr = (*it)->string_value;
+                        const char* lcharptr = "";
+
+                        if (lcharptr != 0)
+                        {
+                            // Add the length         
+                            ////cout << "String length: " << strlen(lcharptr) << "\n";
+                            uint32_t len = strlen(lcharptr);
+                            if (len >= MAX_TEXT_SIZE)
+                            {
+                                len = MAX_TEXT_SIZE - 1;
+                                //SG_LOG(SG_NETWORK, SG_ALERT, "Multiplayer property truncated at MAX_TEXT_SIZE in string " << (*it)->id);
+                                SPRTF("Multiplayer property truncated at MAX_TEXT_SIZE in string %d\n", pid );
+                            }
+
+                            // XXX This should not be using 4 bytes per character!
+                            // If there's not enough room for this property, drop it
+                            // on the floor.
+                            if (ptr + 2 + ((len + 3) & ~3) >= msgEnd)
+                            {
+                                // SG_LOG(SG_NETWORK, SG_ALERT, "Multiplayer property not sent (no room) string " << (*it)->id);
+                                SPRTF("Multiplayer property not sent (no room) string %d\n", pid );
+                                goto escape;
+                            }
+                            //cout << "String length unint32: " << len << "\n";
+                            *ptr++ = id;
+                            *ptr++ = XDR_encode_uint32(len);
+                            if (len != 0)
+                            {
+                                // Now the text itself
+                                // XXX This should not be using 4 bytes per character!
+                                int lcount = 0;
+                                while ((*lcharptr != '\0') && (lcount < MAX_TEXT_SIZE))
+                                {
+                                    if (ptr + 2 >= msgEnd)
+                                    {
+                                        //SG_LOG(SG_NETWORK, SG_ALERT, "Multiplayer packet truncated in string " << (*it)->id << " lcount " << lcount);
+                                        SPRTF("Multiplayer packet truncated in string %d, lcount %d\n", pid, lcount);
+                                        break;
+                                    }
+                                    *ptr++ = XDR_encode_int8(*lcharptr);
+                                    lcharptr++;
+                                    lcount++;
+                                }
+                                // Now pad if required
+                                while ((lcount % 4) != 0)
+                                {
+                                    if (ptr + 2 >= msgEnd)
+                                    {
+                                        // SG_LOG(SG_NETWORK, SG_ALERT, "Multiplayer packet truncated in string " << (*it)->id << " lcount " << lcount);
+                                        SPRTF("Multiplayer packet truncated in string %d, lcount %d\n", pid, lcount);
+                                        break;
+                                    }
+                                    *ptr++ = XDR_encode_int8(0);
+                                    lcount++;
+                                }
+                            }
+                            propsDone++;
+                            partcount[partition]++;
+                            vIdsAdded.push_back(pid);
+                        }
+                        else
+                        {
+                            // Nothing to encode
+                            *ptr++ = id;
+                            *ptr++ = XDR_encode_uint32(0);
+                            propsDone++;
+                            partcount[partition]++;
+                            vIdsAdded.push_back(pid);
+                        }
+                    }
+                }
+                break;
+
+                default:
+                    *ptr++ = id;
+                    //*ptr++ = XDR_encode_float((*it)->float_value);;
+                    *ptr++ = XDR_encode_float(0.0);
+                    propsDone++;
+                    partcount[partition]++;
+                    vIdsAdded.push_back(pid);
+                    break;
+                }
+            }
+            //++it;
+        }
+    }
+escape:
+    unsigned int msgLen = reinterpret_cast<char*>(ptr) - Msg;   // msgBuf.Msg;
+    SPRTF("Done %d of %d v2 properties (v1=%d)... partition %d... ", propsDone, numProperties, numProperties1, partition);
+    for (i = 0; i < 4; i++) {
+        if (partcount[i])
+            SPRTF("%d: %d ", i, partcount[i]);
+    }
+    SPRTF("\n");
+    SPRTF("Have test message of length %d...\n", msgLen);
+    size_t ii, max = vIdsAdded.size();
+    SPRTF("Total %d ID added...\n", (int)max);
+    mINTINT mIds;
+    for (ii = 0; ii < max; ii++)
+    {
+        pid = vIdsAdded[ii];
+        const IdPropertyList *list = findProperty(pid);
+        if (list) {
+            SPRTF("%5d %s v%d ", pid, list->name, list->version);
+        }
+        else {
+            SPRTF("%5d NO LIST ", pid);
+        }
+        // check for DUPLICATES
+        iINTINT j = mIds.find(pid);
+        if (j == mIds.end()) {
+            mIds[pid] = 0;
+        }
+        else {
+            SPRTF("*** DUPLICATE *** ");
+        }
+
+        SPRTF("\n");
+    }
+
+    exit(1);
+}
 
 // eof = raw-log.cxx
