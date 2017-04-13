@@ -893,16 +893,6 @@ static const IdPropertyList sIdPropertyList[] = {
     { 10527, "sim/multiplay/generic/short[27]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
     { 10528, "sim/multiplay/generic/short[28]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
     { 10529, "sim/multiplay/generic/short[29]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
-    { 10520, "sim/multiplay/generic/short[20]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
-    { 10521, "sim/multiplay/generic/short[21]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
-    { 10522, "sim/multiplay/generic/short[22]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
-    { 10523, "sim/multiplay/generic/short[23]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
-    { 10524, "sim/multiplay/generic/short[24]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
-    { 10525, "sim/multiplay/generic/short[25]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
-    { 10526, "sim/multiplay/generic/short[26]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
-    { 10527, "sim/multiplay/generic/short[27]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
-    { 10528, "sim/multiplay/generic/short[28]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
-    { 10529, "sim/multiplay/generic/short[29]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
     { 10530, "sim/multiplay/generic/short[30]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
     { 10531, "sim/multiplay/generic/short[31]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
     { 10532, "sim/multiplay/generic/short[32]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
@@ -972,12 +962,30 @@ void init_full_map()
     if (done_init)
         return;
     unsigned int id, i;
+    unsigned int dupe_cnt = 0;
+    vUINT dupes;
     for (i = 0; i < numProperties; i++)
     {
         id = sIdPropertyList[i].id;
-        mIdCounts[id] = 0;
+        iINTINT j = mIdCounts.find(id);
+        if (j == mIdCounts.end()) {
+            mIdCounts[id] = 0;
+        }
+        else {
+            dupe_cnt++;
+            dupes.push_back(id);
+        }
     }
     done_init = 1;
+    if (dupe_cnt) {
+        // 10: 10520 10521 10522 10523 10524 10525 10526 10527 10528 10529
+        sprtf("Note: Have %d (%d) duplicated IDs...\n", dupe_cnt, (int)dupes.size());
+        for (i = 0; i < dupe_cnt; i++) {
+            id = dupes[i];
+            SPRTF("%u ", id);
+        }
+        SPRTF("\n");
+    }
 }
 
 void add_id_count(unsigned int id)
