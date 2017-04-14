@@ -13,7 +13,7 @@
 @set TMPCM=%TMPSRC%\CMakeLists.txt
 @REM set DOPAUSE=pause
 @set DOPAUSE=ask
-@set TMPSG=X:\install\msvc100\simgear
+@set TMPSG=X:\install\msvc140\simgear
 @set TMP3RD=X:\3rdParty
 
 @if NOT EXIST %TMPSG%\nul (
@@ -35,6 +35,7 @@
 @set TMPOPTS=-DCMAKE_INSTALL_PREFIX=%TMPINS%
 @REM TODO: tape support - set TMPOPTS=%TMPOPTS% -DADD_RMT_LIB:BOOL=YES
 @set TMPOPTS=%TMPOPTS% -DCMAKE_PREFIX_PATH=%TMPSG%;%TMP3RD%
+@set TMPOPTS=%TMPOPTS% -DUSE_SIMGEAR_LIB:BOOL=TRUE
 
 :RPT
 @if "%~1x" == "x" goto GOTCMD
