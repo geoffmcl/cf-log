@@ -2304,7 +2304,7 @@ void Create_Prop_Packet()
     uint32_t len;
     char fill = (char)0xee;
 
-    SPRTF("Packet pad bytes %d, hdr %d, pos %d, rem %d\n", (int)sizeof(Msg), (int)msgHdr, (int)posMsg,
+    SPRTF("Packet pad bytes %d, hdr %d, pos %d, rem %d bytes, for 'props'\n", (int)sizeof(Msg), (int)msgHdr, (int)posMsg,
         (sizeof(Msg) - msgHdr - posMsg));
     for (i = 0; i < sizeof(Msg); i++)
         Msg[i] = fill;
@@ -2329,7 +2329,7 @@ void Create_Prop_Packet()
                 if (ptr + 2 >= msgEnd)
                 {
                     // SG_LOG(SG_NETWORK, SG_ALERT, "Multiplayer packet truncated prop id: " << (*it)->id << ": " << propDef->name);
-                    SPRTF("Multiplayer packet truncated prop id: %d\nnode: %s\n", pid, propDef->name);
+                    SPRTF("\nWARNING: Multiplayer packet truncated prop id: %d\nnode: %s\n", pid, propDef->name);
                     break;
                 }
 
@@ -2490,7 +2490,7 @@ void Create_Prop_Packet()
                             {
                                 len = MAX_TEXT_SIZE - 1;
                                 //SG_LOG(SG_NETWORK, SG_ALERT, "Multiplayer property truncated at MAX_TEXT_SIZE in string " << (*it)->id);
-                                SPRTF("Multiplayer property truncated at MAX_TEXT_SIZE in string id %d\n", pid);
+                                SPRTF("\nWARNING: Multiplayer property truncated at MAX_TEXT_SIZE in string id %d\n", pid);
                             }
 
                             char *encodeStart = (char*)ptr;
@@ -2499,7 +2499,7 @@ void Create_Prop_Packet()
                             if (encodeStart + 2 + len >= msgEndbyte)
                             {
                                 //SG_LOG(SG_NETWORK, SG_ALERT, "Multiplayer property not sent (no room) string " << (*it)->id);
-                                SPRTF("Multiplayer property not sent (no room) string %d\n", pid);
+                                SPRTF("\nWARNING: Multiplayer property not sent (no room) string %d\n", pid);
                                 goto escape;
                             }
 
@@ -2514,7 +2514,7 @@ void Create_Prop_Packet()
                                     if (encodeStart + 2 >= msgEndbyte)
                                     {
                                         //SG_LOG(SG_NETWORK, SG_ALERT, "Multiplayer packet truncated in string " << (*it)->id << " lcount " << lcount);
-                                        SPRTF("Multiplayer packet truncated in string %d, lcount %d\n", pid, lcount);
+                                        SPRTF("\nWARNING: Multiplayer packet truncated in string %d, lcount %d\n", pid, lcount);
                                         break;
                                     }
                                     *encodeStart++ = *lcharptr++;
@@ -2554,7 +2554,7 @@ void Create_Prop_Packet()
                             {
                                 len = MAX_TEXT_SIZE - 1;
                                 //SG_LOG(SG_NETWORK, SG_ALERT, "Multiplayer property truncated at MAX_TEXT_SIZE in string " << (*it)->id);
-                                SPRTF("Multiplayer property truncated at MAX_TEXT_SIZE in string %d\n", pid );
+                                SPRTF("\nWARNING: Multiplayer property truncated at MAX_TEXT_SIZE in string %d\n", pid );
                             }
 
                             // XXX This should not be using 4 bytes per character!
@@ -2563,7 +2563,7 @@ void Create_Prop_Packet()
                             if (ptr + 2 + ((len + 3) & ~3) >= msgEnd)
                             {
                                 // SG_LOG(SG_NETWORK, SG_ALERT, "Multiplayer property not sent (no room) string " << (*it)->id);
-                                SPRTF("Multiplayer property not sent (no room) string %d\n", pid );
+                                SPRTF("\nWARNING: Multiplayer property not sent (no room) string %d\n", pid );
                                 goto escape;
                             }
                             //cout << "String length unint32: " << len << "\n";
@@ -2579,7 +2579,7 @@ void Create_Prop_Packet()
                                     if (ptr + 2 >= msgEnd)
                                     {
                                         //SG_LOG(SG_NETWORK, SG_ALERT, "Multiplayer packet truncated in string " << (*it)->id << " lcount " << lcount);
-                                        SPRTF("Multiplayer packet truncated in string %d, lcount %d\n", pid, lcount);
+                                        SPRTF("\nWARNING: Multiplayer packet truncated in string %d, lcount %d\n", pid, lcount);
                                         break;
                                     }
                                     *ptr++ = XDR_encode_int8(*lcharptr);
@@ -2592,7 +2592,7 @@ void Create_Prop_Packet()
                                     if (ptr + 2 >= msgEnd)
                                     {
                                         // SG_LOG(SG_NETWORK, SG_ALERT, "Multiplayer packet truncated in string " << (*it)->id << " lcount " << lcount);
-                                        SPRTF("Multiplayer packet truncated in string %d, lcount %d\n", pid, lcount);
+                                        SPRTF("\nWARNING: Multiplayer packet truncated in string %d, lcount %d\n", pid, lcount);
                                         break;
                                     }
                                     *ptr++ = XDR_encode_int8(0);
