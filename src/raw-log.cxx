@@ -2683,11 +2683,11 @@ escape:
     else {
         SPRTF("Unable to write packet %d, to '%s'!\n", (int)sizeof(Msg), def_dump);
     }
-    SPRTF("\nShow of packet created... value %#x indicates unwritten areas...\n", (fill & 0xff));
+    SPRTF("\nShow decode of props part of packet created...\n");
     verbosity = 9;
     int prop_cnt = Deal_With_Properties(xdr, msgEnd, propsEnd);
     if (VERB5) {
-        SPRTF("[v5]: Done position packet: len %d bytes, %d props...\n", msgLen, prop_cnt);
+        SPRTF("[v5]: Done packet: len %d bytes, %d props...\n", msgLen, prop_cnt);
     }
 
     exit(1);
