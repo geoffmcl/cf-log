@@ -75,6 +75,7 @@ static int verbosity = 1;
 #define VERB9 (verbosity >= 9)
 
 static const char *def_log = "tempraw.txt";
+static const char *def_dump = "tempdump.pkt";
 static const char *usr_input = 0;
 static struct stat sbuf;
 static FILE *raw_log_fp = 0;
@@ -90,6 +91,7 @@ static int show_consumed_bytes = 0;
 static const char *sample = "F:\\Projects\\cf-log\\data\\sampleudp01.log";
 #endif
 static int do_packet_test = 0;
+static int show_not_in_version1 = 0;    // this should be known
 
 static vSTG vWarnings;
 int add_2_list(char *msg)
@@ -294,8 +296,8 @@ int parse_args( int argc, char **argv )
         usr_input = strdup(sample);
     }
 #endif
-    if (!usr_input) {
-        SPRTF("%s: No user input found in command!\n", module);
+    if (!usr_input && !do_packet_test) {
+        SPRTF("%s: No user input found in command! Not -t...\n", module);
         return 1;
     }
     return 0;
@@ -1434,12 +1436,19 @@ int Deal_With_Properties(xdr_data_t * xdr, xdr_data_t * msgEnd, xdr_data_t * pro
             if (plist1)
             {
                 // This will probably be the SAME???
+                if (strcmp(plist->name, plist1->name)) {
+                    if (VERB9) {
+                        SPRTF("[v9]: %5d: Strings are different!\n", id);
+                        SPRTF("1: %s\n", plist1->name);
+                        SPRTF("2: %s\n", plist->name);
+                    }
+                }
             }
             else
             {
-                if (VERB9)
+                if (VERB9 && show_not_in_version1)
                 {
-                    SPRTF("[v9]: Such a property did %d NOT exist in Version 1!\n", id);
+                    SPRTF("[v9]: %5d: Such a property did NOT exist in Version 1!\n", id);
                 }
             }
         }
@@ -2260,18 +2269,45 @@ short get_scaled_short(double v, double scale)
     return rv;
 }
 
+int get_nxt_int()
+{
+    static int next_int = 0;
+    next_int++;
+    return next_int;
+}
+double get_nxt_dbl()
+{
+    static double next_dbl = 0.0;
+    next_dbl += 0.1;
+    return next_dbl;
+}
+
 void Create_Prop_Packet()
 {
     int protocolVersion = 2;
     unsigned int i, pid;
-    char Msg[MAX_PACKET_SIZE * 3];
-    xdr_data_t *ptr = reinterpret_cast<xdr_data_t*>(Msg + sizeof(T_MsgHdr) + sizeof(T_PositionMsg));
+    char Msg[MAX_PACKET_SIZE];
+    size_t msgHdr = sizeof(T_MsgHdr);
+    size_t posMsg = sizeof(T_PositionMsg);
+    xdr_data_t *ptr = reinterpret_cast<xdr_data_t*>(Msg + msgHdr + posMsg);
     // xdr_data_t *msgEnd = reinterpret_cast<xdr_data_t*>(Msg + MAX_PACKET_SIZE);
-    xdr_data_t *msgEnd = reinterpret_cast<xdr_data_t*>(Msg + (MAX_PACKET_SIZE * 3));
+    xdr_data_t *msgEnd = reinterpret_cast<xdr_data_t*>(Msg + (MAX_PACKET_SIZE));
+    xdr_data_t *xdr;
     int partition = 1;
     int propsDone = 0;
     int partcount[4];
     vUINT vIdsAdded;
+    int ival;
+    double dval;
+    const char *pt;
+    const char* lcharptr;
+    uint32_t len;
+    char fill = (char)0xee;
+
+    SPRTF("Packet pad bytes %d, hdr %d, pos %d, rem %d\n", (int)sizeof(Msg), (int)msgHdr, (int)posMsg,
+        (sizeof(Msg) - msgHdr - posMsg));
+    for (i = 0; i < sizeof(Msg); i++)
+        Msg[i] = fill;
 
     for (i = 0; i < 4; i++)
         partcount[i] = 0;
@@ -2287,7 +2323,7 @@ void Create_Prop_Packet()
             
             //if (pid > 10319)
             //    break;
-
+            xdr = ptr;
             if (propDef->version == partition || propDef->version > protocolVersion) // getProtocolToUse())
             {
                 if (ptr + 2 >= msgEnd)
@@ -2324,55 +2360,73 @@ void Create_Prop_Packet()
                 switch (transmit_type) {
                 case TT_SHORTINT:
                 {
+                    if (pid == 10)
+                        ival = protocolVersion;
+                    else
+                        ival = get_nxt_int();
                     //*ptr++ = XDR_encode_shortints32((*it)->id, (*it)->int_value);
-                    *ptr++ = XDR_encode_shortints32(pid, 0);
+                    *ptr++ = XDR_encode_shortints32(pid, ival);
                     propsDone++;
                     partcount[partition]++;
                     vIdsAdded.push_back(pid);
+                    if (VERB9)
+                        SPRTF("[v9]: %5d: %s SHORTINT %d\n", pid, propDef->name, ival);
                     break;
                 }
                 case TT_SHORT_FLOAT_1:
                 {
                     //short value = get_scaled_short((*it)->float_value, 10.0);
                     //*ptr++ = XDR_encode_shortints32((*it)->id, value);
-                    short value = get_scaled_short(0.0, 10.0);
+                    dval = get_nxt_dbl();
+                    short value = get_scaled_short(dval, 10.0);
                     *ptr++ = XDR_encode_shortints32(pid, value);
                     propsDone++;
                     partcount[partition]++;
                     vIdsAdded.push_back(pid);
+                    if (VERB9)
+                        SPRTF("[v9]: %5d: %s FLOAT_1 %lf\n", pid, propDef->name, dval);
                     break;
                 }
                 case TT_SHORT_FLOAT_2:
                 {
                     //short value = get_scaled_short((*it)->float_value, 100.0);
                     //*ptr++ = XDR_encode_shortints32((*it)->id, value);
-                    short value = get_scaled_short(0.0, 100.0);
+                    dval = get_nxt_dbl();
+                    short value = get_scaled_short(dval, 100.0);
                     *ptr++ = XDR_encode_shortints32(pid, value);
                     propsDone++;
                     partcount[partition]++;
                     vIdsAdded.push_back(pid);
+                    if (VERB9)
+                        SPRTF("[v9]: %5d: %s FLOAT_2 %lf\n", pid, propDef->name, dval);
                     break;
                 }
                 case TT_SHORT_FLOAT_3:
                 {
                     //short value = get_scaled_short((*it)->float_value, 1000.0);
                     //*ptr++ = XDR_encode_shortints32((*it)->id, value);
-                    short value = get_scaled_short(0.0, 1000.0);
+                    dval = get_nxt_dbl();
+                    short value = get_scaled_short(dval, 1000.0);
                     *ptr++ = XDR_encode_shortints32(pid, value);
                     propsDone++;
                     partcount[partition]++;
                     vIdsAdded.push_back(pid);
+                    if (VERB9)
+                        SPRTF("[v9]: %5d: %s FLOAT_3 %lf\n", pid, propDef->name, dval);
                     break;
                 }
                 case TT_SHORT_FLOAT_4:
                 {
                     //short value = get_scaled_short((*it)->float_value, 10000.0);
                     //*ptr++ = XDR_encode_shortints32((*it)->id, value);
-                    short value = get_scaled_short(0.0, 10000.0);
+                    dval = get_nxt_dbl();
+                    short value = get_scaled_short(dval, 10000.0);
                     *ptr++ = XDR_encode_shortints32(pid, value);
                     propsDone++;
                     partcount[partition]++;
                     vIdsAdded.push_back(pid);
+                    if (VERB9)
+                        SPRTF("[v9]: %5d: %s FLOAT_4 %lf\n", pid, propDef->name, dval);
                     break;
                 }
 
@@ -2380,11 +2434,14 @@ void Create_Prop_Packet()
                 {
                     //short value = get_scaled_short((*it)->float_value, 32767.0);
                     //*ptr++ = XDR_encode_shortints32((*it)->id, value);
-                    short value = get_scaled_short(0.0, 32767.0);
+                    dval = get_nxt_dbl();
+                    short value = get_scaled_short(dval, 32767.0);
                     *ptr++ = XDR_encode_shortints32(pid, value);
                     propsDone++;
                     partcount[partition]++;
                     vIdsAdded.push_back(pid);
+                    if (VERB9)
+                        SPRTF("[v9]: %5d: %s FLOAT_N %lf\n", pid, propDef->name, dval);
                     break;
                 }
 
@@ -2393,35 +2450,42 @@ void Create_Prop_Packet()
                 case simgear::props::LONG:
                     *ptr++ = id;
                     //*ptr++ = XDR_encode_uint32((*it)->int_value);
-                    *ptr++ = XDR_encode_uint32(0);
+                    ival = get_nxt_int();
+                    *ptr++ = XDR_encode_uint32(ival);
                     propsDone++;
                     partcount[partition]++;
                     vIdsAdded.push_back(pid);
+                    if (VERB9)
+                        SPRTF("[v9]: %5d: %s LONG %d\n", pid, propDef->name, ival);
                     break;
                 case simgear::props::FLOAT:
                 case simgear::props::DOUBLE:
                     *ptr++ = id;
+                    dval = get_nxt_dbl();
                     //*ptr++ = XDR_encode_float((*it)->float_value);
-                    *ptr++ = XDR_encode_float(0.0);
+                    *ptr++ = XDR_encode_float(dval);
                     propsDone++;
                     partcount[partition]++;
                     vIdsAdded.push_back(pid);
+                    if (VERB9)
+                        SPRTF("[v9]: %5d: %s DOUBLE %lf\n", pid, propDef->name, dval);
                     break;
                 case simgear::props::STRING:
                 case simgear::props::UNSPECIFIED:
                 {
+                    len = 0;
+                    pt = "UNK";
                     if (protocolVersion > 1)
                     {
                         // New string encoding:
                         // xdr[0] : ID length packed into 32 bit containing two shorts.
                         // xdr[1..len/4] The string itself (char[length])
                         //const char* lcharptr = (*it)->string_value;
-                        const char* lcharptr = "";
-
+                        lcharptr = "";
+                        pt = "STRING_N";
                         if (lcharptr != 0)
                         {
-                            uint32_t len = strlen(lcharptr);
-
+                            len = strlen(lcharptr);
                             if (len >= MAX_TEXT_SIZE)
                             {
                                 len = MAX_TEXT_SIZE - 1;
@@ -2479,13 +2543,13 @@ void Create_Prop_Packet()
                         // The string itself
                         // Padding to the nearest 4-bytes.        
                         // const char* lcharptr = (*it)->string_value;
-                        const char* lcharptr = "";
-
+                        lcharptr = "";
+                        pt = "STRING";
                         if (lcharptr != 0)
                         {
                             // Add the length         
                             ////cout << "String length: " << strlen(lcharptr) << "\n";
-                            uint32_t len = strlen(lcharptr);
+                            len = strlen(lcharptr);
                             if (len >= MAX_TEXT_SIZE)
                             {
                                 len = MAX_TEXT_SIZE - 1;
@@ -2549,16 +2613,22 @@ void Create_Prop_Packet()
                             vIdsAdded.push_back(pid);
                         }
                     }
+                    if (VERB9)
+                        SPRTF("[v9]: %5d: %s %s %d\n", pid, propDef->name, pt, len);
+
                 }
                 break;
 
                 default:
                     *ptr++ = id;
                     //*ptr++ = XDR_encode_float((*it)->float_value);;
-                    *ptr++ = XDR_encode_float(0.0);
+                    dval = get_nxt_dbl();
+                    *ptr++ = XDR_encode_float(dval);
                     propsDone++;
                     partcount[partition]++;
                     vIdsAdded.push_back(pid);
+                    if (VERB9)
+                        SPRTF("[v9]: %5d: %s DEF_DOUBLE %lf\n", pid, propDef->name, dval);
                     break;
                 }
             }
@@ -2597,6 +2667,27 @@ escape:
         }
 
         SPRTF("\n");
+    }
+    xdr = reinterpret_cast<xdr_data_t*>(Msg + msgHdr + posMsg);
+    xdr_data_t *propsEnd = (xdr_data_t *)(Msg + MAX_PACKET_SIZE);
+    msgEnd = reinterpret_cast<xdr_data_t*>(Msg + msgLen);   // beyond last prop encoded
+    FILE * fp = fopen(def_dump, "wb");
+    if (fp) {
+        size_t wtn = fwrite(Msg, 1, sizeof(Msg), fp);
+        fclose(fp);
+        if (wtn == sizeof(Msg))
+            SPRTF("Written packet %d, to '%s'... value %#x indicates unwritten areas...\n", (int)wtn, def_dump, (fill & 0xff));
+        else
+            SPRTF("Appears write of packet %d, to '%s' failed!\n", (int)wtn, def_dump);
+    }
+    else {
+        SPRTF("Unable to write packet %d, to '%s'!\n", (int)sizeof(MSG), def_dump);
+    }
+    SPRTF("\nShow of packet created... value %#x indicates unwritten areas...\n", (fill & 0xff));
+    verbosity = 9;
+    int prop_cnt = Deal_With_Properties(xdr, msgEnd, propsEnd);
+    if (VERB5) {
+        SPRTF("[v5]: Done position packet: len %d bytes, %d props...\n", msgLen, prop_cnt);
     }
 
     exit(1);
