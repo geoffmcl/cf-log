@@ -2681,7 +2681,7 @@ escape:
             SPRTF("Appears write of packet %d, to '%s' failed!\n", (int)wtn, def_dump);
     }
     else {
-        SPRTF("Unable to write packet %d, to '%s'!\n", (int)sizeof(MSG), def_dump);
+        SPRTF("Unable to write packet %d, to '%s'!\n", (int)sizeof(Msg), def_dump);
     }
     SPRTF("\nShow of packet created... value %#x indicates unwritten areas...\n", (fill & 0xff));
     verbosity = 9;
