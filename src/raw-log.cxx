@@ -779,9 +779,9 @@ static const IdPropertyList sIdPropertyList[] = {
     { 1400, "scenery/events", simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
 
     { 1500, "instrumentation/transponder/transmitted-id", simgear::props::INT, TT_SHORTINT,  V1_1_PROP_ID, NULL },
-    { 1501, "instrumentation/transponder/altitude", simgear::props::INT, TT_ASIS,  TT_SHORTINT, NULL },
-    { 1502, "instrumentation/transponder/ident", simgear::props::BOOL, TT_ASIS,  TT_SHORTINT, NULL },
-    { 1503, "instrumentation/transponder/inputs/mode", simgear::props::INT, TT_ASIS,  TT_SHORTINT, NULL },
+    { 1501, "instrumentation/transponder/altitude", simgear::props::INT, TT_ASIS, V1_1_PROP_ID, NULL },
+    { 1502, "instrumentation/transponder/ident", simgear::props::BOOL, TT_SHORTINT, V1_1_PROP_ID, NULL },
+    { 1503, "instrumentation/transponder/inputs/mode", simgear::props::INT, TT_SHORTINT, V1_1_PROP_ID, NULL },
 
     { 10001, "sim/multiplay/transmission-freq-hz",  simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
     { 10002, "sim/multiplay/chat",  simgear::props::STRING, TT_ASIS,  V1_1_2_PROP_ID, NULL },
@@ -952,6 +952,7 @@ static const IdPropertyList sIdPropertyList[] = {
     { 10579, "sim/multiplay/generic/short[79]", simgear::props::INT, TT_SHORTINT,  V1_1_2_PROP_ID, NULL },
 
 };
+
 /*
 * For the 2017.x version 2 protocol the properties are sent in two partitions,
 * the first of these is a V1 protocol packet (which should be fine with all clients), and a V2 partition
@@ -2290,7 +2291,6 @@ void Create_Prop_Packet()
     size_t msgHdr = sizeof(T_MsgHdr);
     size_t posMsg = sizeof(T_PositionMsg);
     xdr_data_t *ptr = reinterpret_cast<xdr_data_t*>(Msg + msgHdr + posMsg);
-    // xdr_data_t *msgEnd = reinterpret_cast<xdr_data_t*>(Msg + MAX_PACKET_SIZE);
     xdr_data_t *msgEnd = reinterpret_cast<xdr_data_t*>(Msg + (MAX_PACKET_SIZE));
     xdr_data_t *xdr;
     int partition = 1;
@@ -2301,8 +2301,9 @@ void Create_Prop_Packet()
     double dval;
     const char *pt;
     const char* lcharptr;
-    uint32_t len;
+    uint32_t len, plen;
     char fill = (char)0xee;
+    bool overflow = false;
 
     SPRTF("Packet pad bytes %d, hdr %d, pos %d, rem %d bytes, for 'props'\n", (int)sizeof(Msg), (int)msgHdr, (int)posMsg,
         (sizeof(Msg) - msgHdr - posMsg));
@@ -2330,7 +2331,8 @@ void Create_Prop_Packet()
                 {
                     // SG_LOG(SG_NETWORK, SG_ALERT, "Multiplayer packet truncated prop id: " << (*it)->id << ": " << propDef->name);
                     SPRTF("\nWARNING: Multiplayer packet truncated prop id: %d\nnode: %s\n", pid, propDef->name);
-                    break;
+                    overflow = true;
+                    goto escape;
                 }
 
                 // First element is the ID. Write it out when we know we have room for
@@ -2369,8 +2371,9 @@ void Create_Prop_Packet()
                     propsDone++;
                     partcount[partition]++;
                     vIdsAdded.push_back(pid);
+                    plen = (char *)ptr - (char *)xdr;
                     if (VERB9)
-                        SPRTF("[v9]: %5d: %s SHORTINT %d\n", pid, propDef->name, ival);
+                        SPRTF("[v9]: %5d: %s SHORTINT %d (%d)\n", pid, propDef->name, ival, (int)plen);
                     break;
                 }
                 case TT_SHORT_FLOAT_1:
@@ -2383,8 +2386,9 @@ void Create_Prop_Packet()
                     propsDone++;
                     partcount[partition]++;
                     vIdsAdded.push_back(pid);
+                    plen = (char *)ptr - (char *)xdr;
                     if (VERB9)
-                        SPRTF("[v9]: %5d: %s FLOAT_1 %lf\n", pid, propDef->name, dval);
+                        SPRTF("[v9]: %5d: %s FLOAT_1 %lf (%d)\n", pid, propDef->name, dval, (int)plen);
                     break;
                 }
                 case TT_SHORT_FLOAT_2:
@@ -2397,8 +2401,9 @@ void Create_Prop_Packet()
                     propsDone++;
                     partcount[partition]++;
                     vIdsAdded.push_back(pid);
+                    plen = (char *)ptr - (char *)xdr;
                     if (VERB9)
-                        SPRTF("[v9]: %5d: %s FLOAT_2 %lf\n", pid, propDef->name, dval);
+                        SPRTF("[v9]: %5d: %s FLOAT_2 %lf (%d)\n", pid, propDef->name, dval, (int)plen);
                     break;
                 }
                 case TT_SHORT_FLOAT_3:
@@ -2411,8 +2416,9 @@ void Create_Prop_Packet()
                     propsDone++;
                     partcount[partition]++;
                     vIdsAdded.push_back(pid);
+                    plen = (char *)ptr - (char *)xdr;
                     if (VERB9)
-                        SPRTF("[v9]: %5d: %s FLOAT_3 %lf\n", pid, propDef->name, dval);
+                        SPRTF("[v9]: %5d: %s FLOAT_3 %lf (%d)\n", pid, propDef->name, dval, (int)plen);
                     break;
                 }
                 case TT_SHORT_FLOAT_4:
@@ -2425,8 +2431,9 @@ void Create_Prop_Packet()
                     propsDone++;
                     partcount[partition]++;
                     vIdsAdded.push_back(pid);
+                    plen = (char *)ptr - (char *)xdr;
                     if (VERB9)
-                        SPRTF("[v9]: %5d: %s FLOAT_4 %lf\n", pid, propDef->name, dval);
+                        SPRTF("[v9]: %5d: %s FLOAT_4 %lf (%d)\n", pid, propDef->name, dval, (int)plen);
                     break;
                 }
 
@@ -2440,8 +2447,9 @@ void Create_Prop_Packet()
                     propsDone++;
                     partcount[partition]++;
                     vIdsAdded.push_back(pid);
+                    plen = (char *)ptr - (char *)xdr;
                     if (VERB9)
-                        SPRTF("[v9]: %5d: %s FLOAT_N %lf\n", pid, propDef->name, dval);
+                        SPRTF("[v9]: %5d: %s FLOAT_N %lf (%d)\n", pid, propDef->name, dval, (int)plen);
                     break;
                 }
 
@@ -2455,8 +2463,9 @@ void Create_Prop_Packet()
                     propsDone++;
                     partcount[partition]++;
                     vIdsAdded.push_back(pid);
+                    plen = (char *)ptr - (char *)xdr;
                     if (VERB9)
-                        SPRTF("[v9]: %5d: %s LONG %d\n", pid, propDef->name, ival);
+                        SPRTF("[v9]: %5d: %s LONG %d (%d)\n", pid, propDef->name, ival, (int)plen);
                     break;
                 case simgear::props::FLOAT:
                 case simgear::props::DOUBLE:
@@ -2467,8 +2476,9 @@ void Create_Prop_Packet()
                     propsDone++;
                     partcount[partition]++;
                     vIdsAdded.push_back(pid);
+                    plen = (char *)ptr - (char *)xdr;
                     if (VERB9)
-                        SPRTF("[v9]: %5d: %s DOUBLE %lf\n", pid, propDef->name, dval);
+                        SPRTF("[v9]: %5d: %s DOUBLE %lf (%d)\n", pid, propDef->name, dval, (int)plen);
                     break;
                 case simgear::props::STRING:
                 case simgear::props::UNSPECIFIED:
@@ -2500,6 +2510,7 @@ void Create_Prop_Packet()
                             {
                                 //SG_LOG(SG_NETWORK, SG_ALERT, "Multiplayer property not sent (no room) string " << (*it)->id);
                                 SPRTF("\nWARNING: Multiplayer property not sent (no room) string %d\n", pid);
+                                overflow = true;
                                 goto escape;
                             }
 
@@ -2515,6 +2526,7 @@ void Create_Prop_Packet()
                                     {
                                         //SG_LOG(SG_NETWORK, SG_ALERT, "Multiplayer packet truncated in string " << (*it)->id << " lcount " << lcount);
                                         SPRTF("\nWARNING: Multiplayer packet truncated in string %d, lcount %d\n", pid, lcount);
+                                        overflow = true;
                                         break;
                                     }
                                     *encodeStart++ = *lcharptr++;
@@ -2564,6 +2576,7 @@ void Create_Prop_Packet()
                             {
                                 // SG_LOG(SG_NETWORK, SG_ALERT, "Multiplayer property not sent (no room) string " << (*it)->id);
                                 SPRTF("\nWARNING: Multiplayer property not sent (no room) string %d\n", pid );
+                                overflow = true;
                                 goto escape;
                             }
                             //cout << "String length unint32: " << len << "\n";
@@ -2580,6 +2593,7 @@ void Create_Prop_Packet()
                                     {
                                         //SG_LOG(SG_NETWORK, SG_ALERT, "Multiplayer packet truncated in string " << (*it)->id << " lcount " << lcount);
                                         SPRTF("\nWARNING: Multiplayer packet truncated in string %d, lcount %d\n", pid, lcount);
+                                        overflow = true;
                                         break;
                                     }
                                     *ptr++ = XDR_encode_int8(*lcharptr);
@@ -2593,6 +2607,7 @@ void Create_Prop_Packet()
                                     {
                                         // SG_LOG(SG_NETWORK, SG_ALERT, "Multiplayer packet truncated in string " << (*it)->id << " lcount " << lcount);
                                         SPRTF("\nWARNING: Multiplayer packet truncated in string %d, lcount %d\n", pid, lcount);
+                                        overflow = true;
                                         break;
                                     }
                                     *ptr++ = XDR_encode_int8(0);
@@ -2613,8 +2628,9 @@ void Create_Prop_Packet()
                             vIdsAdded.push_back(pid);
                         }
                     }
+                    plen = (char *)ptr - (char *)xdr;
                     if (VERB9)
-                        SPRTF("[v9]: %5d: %s %s %d\n", pid, propDef->name, pt, len);
+                        SPRTF("[v9]: %5d: %s %s %d (%d)\n", pid, propDef->name, pt, (int)len, (int)plen);
 
                 }
                 break;
@@ -2627,13 +2643,18 @@ void Create_Prop_Packet()
                     propsDone++;
                     partcount[partition]++;
                     vIdsAdded.push_back(pid);
+                    plen = (char *)ptr - (char *)xdr;
                     if (VERB9)
-                        SPRTF("[v9]: %5d: %s DEF_DOUBLE %lf\n", pid, propDef->name, dval);
+                        SPRTF("[v9]: %5d: %s DEF_DOUBLE %lf\n", pid, propDef->name, dval, (int)plen);
                     break;
                 }
             }
             //++it;
+            if (overflow)
+                break;
         }
+        if (overflow)
+            break;
     }
 escape:
     unsigned int msgLen = reinterpret_cast<char*>(ptr) - Msg;   // msgBuf.Msg;
@@ -2683,6 +2704,10 @@ escape:
     else {
         SPRTF("Unable to write packet %d, to '%s'!\n", (int)sizeof(Msg), def_dump);
     }
+    /////////////////////////////////////////////////////////////////////////////
+
+
+    ////////////////////////////////////////////////////////////////////////////
     SPRTF("\nShow decode of props part of packet created...\n");
     verbosity = 9;
     int prop_cnt = Deal_With_Properties(xdr, msgEnd, propsEnd);
