@@ -92,6 +92,7 @@ static const char *sample = "F:\\Projects\\cf-log\\data\\sampleudp01.log";
 #endif
 static int do_packet_test = 0;
 static int show_not_in_version1 = 0;    // this should be known
+static size_t g_null_count = 0; // just a count of NULL bytes in the file
 
 static vSTG vWarnings;
 int add_2_list(char *msg)
@@ -1985,12 +1986,12 @@ static int get_next_block()
     size_t i, j, size = raw_data_size;  // MAX_RAW_LOG;
     char *cp = raw_log_buffer;
     if (cp && raw_block_size) {
-        pt = Deal_With_Packet(cp, raw_block_size);
+        pt = Deal_With_Packet(cp, raw_block_size);  // deal with this known 'packet'
         packet_cnt++;
         if (pt < pkt_Max) sPktStr[pt].count++;  // set the packet stats
         j = 0;
         for (i = raw_block_size; i < size; i++) {
-            cp[j++] = cp[i];
+            cp[j++] = cp[i];    // move remainder up to head of buffer, ready for next read if more...
         }
         raw_log_remaining -= raw_block_size;    // reduce remaining in raw log
         raw_data_size = raw_data_size - raw_block_size;  // set size of remaining raw data after this packet
@@ -2013,6 +2014,8 @@ static int get_next_block()
                     if (isMagicHdr(&cp[i])) {
                         break;
                     }
+                    if (cp[i] == 0)
+                        g_null_count++; // keep absolute count of NULL (0) in the file
                 }
                 raw_block_size = i; // either found next, or out of data, 
                 key = 1;    // but have next block
@@ -2044,7 +2047,8 @@ static int get_next_block()
 // int open_raw_log()
 // 
 // Open the raw log 'rb', allocate a read buffer, and
-// search for the first udp block.
+// search for the first udp block/packet.
+// Search up to the *next* isMagicHdr
 //
 // If successful return 0, else 1 is an error
 //
@@ -2097,6 +2101,8 @@ static int open_raw_log()
                 bgn = i;
                 j = 0;
                 for (; i < size; i++) {
+                    if (cp[i] == 0)
+                        g_null_count++; // keep absolute count of NULL (0) in the file
                     cp[j++] = cp[i];
                 }
                 rd = fread(&cp[j], 1, bgn, fp);    // top up the buffer from the file
@@ -2118,6 +2124,8 @@ static int open_raw_log()
                     raw_bgn_secs = get_seconds();   // start of raw log reading
                     return 0;
                 }
+                if (cp[i] == 0)
+                    g_null_count++; // keep absolute count of NULL (0) in the file
             }
         }
     }
@@ -2205,6 +2213,16 @@ static int process_log() // actions of app
                 SPRTF("\n");
             }
         }
+    }
+    if (VERB2) {
+        SPRTF("Processed file '%s', %d bytes... ", usr_input, (int)raw_log_size);
+        if (raw_log_size && g_null_count) {
+            int ipct10 = (int)(((double)g_null_count / (double)raw_log_size) * 1000.0);
+            double pct = (double)ipct10 / 10.0;
+            if (pct > 1.0)
+                SPRTF("%.1lf%% were nuls (%d bytes)...", pct, (int)g_null_count);
+        }
+        SPRTF("\n");
     }
     return 0;
 }
