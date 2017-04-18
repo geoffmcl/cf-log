@@ -1922,10 +1922,27 @@ Packet_Type Deal_With_Packet(char *packet, int len)
  return pkt_Invalid;
 }
 
-static bool isMagicHdr(char *cp)
+static bool isFGFS(char *cp)
 {
     if ((cp[0] == 'F') && (cp[1] == 'G') &&
-        (cp[2] == 'F') && (cp[3] == 'S') &&
+        (cp[2] == 'F') && (cp[3] == 'S'))
+        return true;
+    return false;
+}
+
+//#define RELAY_MAGIC 0x53464746    // GSGF
+static bool isRELAY(char *cp)
+{
+    if ((cp[0] == 'S') && (cp[1] == 'F') &&
+        (cp[2] == 'G') && (cp[3] == 'F'))
+        return true;
+    return false;
+
+}
+
+static bool isMagicHdr(char *cp)
+{
+    if ((isFGFS(cp) || isRELAY(cp)) &&
         (cp[4] == 0) && (cp[5] == 1) &&
         (cp[6] == 0) && (cp[7] == 1)) {
         return true;
