@@ -111,7 +111,7 @@ static int is_digits(char * arg)
 static void give_help( char *name )
 {
     printf("\n");
-    printf("Usage: - version " DOTVERSION "\n");
+    printf("Usage: date " CF_LOG_DATE " version " CF_LOG_VERSION "\n");
     printf("%s [options]\n", name);
     printf("\n");
     printf("Options:\n");

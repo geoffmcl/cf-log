@@ -4,10 +4,21 @@ cmake_minimum_required (VERSION 2.8)
 
 project (cf-log)
 
-# ### NOTE: *** UPDATE ME ***
-set( cfl_MAJOR 1 )
-set( cfl_MINOR 0 )
-set( cfl_POINT 0 )
+# ### NOTE: *** UPDATE 'version.txt' ***
+file(READ version.txt versionFile)
+if (NOT versionFile)
+    message(FATAL_ERROR "Unable to determine libtidy version. version.txt file is missing.")
+endif()
+string(STRIP "${versionFile}" VERSION_TEXT)
+string(REGEX REPLACE "(.*)[\r\n|\n](.*)" "\\1" CF_LOG_VERSION ${VERSION_TEXT})
+string(REGEX REPLACE "(.*)[\r\n|\n](.*)" "\\2" CF_LOG_DATE ${VERSION_TEXT})
+# establish version number
+if (CF_LOG_VERSION AND CF_LOG_DATE)
+    add_definitions( -DCF_LOG_VERSION="${CF_LOG_VERSION}")
+    add_definitions( -DCF_LOG_DATE="${CF_LOG_DATE}")
+else ()
+    message(FATAL_ERROR "*** FAILED to get a VERSION or DATE from version.txt!")
+endif ()    
 
 # Allow developer to select is Dynamic or static library built
 # Presently there is no install of these libraries, so this option has NOT been tested
@@ -20,8 +31,6 @@ option( USE_GEOGRAPHIC_LIB "Set ON to use Geographic library"         OFF )
 
 # use some local cmake modules
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/CMake;${CMAKE_MODULE_PATH}")
-
-add_definitions( -DDOTVERSION="${cfl_MAJOR}.${cfl_MINOR}.${cfl_POINT}")
 
 if (NOT SG_VERSION)
 set( SG_VERSION "2.6") # FIXED: requiring 2.6+ should suffice here actually
